@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if title %}{{ title }} &mdash; {% endif %}{{ site_title }}</title>
+  {% if base_url %}<base href="{{ base_url }}">{% endif %}
+  <link rel="stylesheet" href="/__enginemd/css/{{ css_theme }}">
+  {% for css in extra_css %}
+  <link rel="stylesheet" href="{{ css }}">
+  {% endfor %}
+  {% for raw in head_inline %}
+  {{ raw | safe }}
+  {% endfor %}
+  {% for js in head_scripts %}
+  <script src="{{ js }}"></script>
+  {% endfor %}
+</head>
+<body>
+  <nav class="top-bar">
+    <a href="/" class="home-link">&larr; Sites</a>
+    <span class="site-label">{{ site_title }}</span>
+    {% if title %}<span class="page-title">&mdash; {{ title }}</span>{% endif %}
+    {% if description %}<span class="page-desc">{{ description }}</span>{% endif %}
+  </nav>
+  <main class="markdown-body">
+    {{ content | safe }}
+  </main>
+  {% for js in body_scripts %}
+  <script src="{{ js }}"></script>
+  {% endfor %}
+  {% if watch_mode %}
+  <script>
+    (function() {
+      var ws = new WebSocket('ws://' + location.host + '/__enginemd/ws');
+      ws.onmessage = function(e) {
+        if (e.data === 'reload') { location.reload(); }
+      };
+      ws.onclose = function() { setTimeout(arguments.callee, 3000); };
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

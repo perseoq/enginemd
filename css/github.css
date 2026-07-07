@@ -1,0 +1,61 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #24292f; background: #fff; }
+
+.top-bar { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.5rem; background: #f6f8fa; border-bottom: 1px solid #d0d7de; font-size: 0.9rem; }
+.top-bar .home-link { color: #0969da; text-decoration: none; }
+.top-bar .home-link:hover { text-decoration: underline; }
+.top-bar .site-label { color: #57606a; }
+.top-bar .page-title { color: #24292f; font-weight: 500; }
+.top-bar .page-desc { color: #8b949e; font-size: 0.85rem; }
+
+.markdown-body { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 { margin-top: 1.5rem; margin-bottom: 0.75rem; font-weight: 600; line-height: 1.25; border-bottom: 1px solid #e1e4e8; padding-bottom: 0.3rem; }
+.markdown-body h1 { font-size: 2em; }
+.markdown-body h2 { font-size: 1.5em; }
+.markdown-body h3 { font-size: 1.25em; }
+.markdown-body p { margin-bottom: 1rem; }
+.markdown-body a { color: #0969da; text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body blockquote { margin: 1rem 0; padding: 0.5rem 1rem; color: #57606a; border-left: 0.25em solid #d0d7de; }
+.markdown-body ul, .markdown-body ol { margin: 0.75rem 0; padding-left: 2rem; }
+.markdown-body li { margin: 0.25rem 0; }
+.markdown-body hr { margin: 1.5rem 0; border: 0; border-top: 1px solid #d0d7de; }
+.markdown-body pre { margin: 1rem 0; padding: 1rem; background: #f6f8fa; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
+.markdown-body code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 0.85em; padding: 0.2em 0.4em; background: #ebedef; border-radius: 3px; }
+.markdown-body pre code { padding: 0; background: none; }
+.markdown-body table { width: 100%; margin: 1rem 0; border-collapse: collapse; }
+.markdown-body th, .markdown-body td { padding: 0.5rem 0.75rem; border: 1px solid #d0d7de; }
+.markdown-body th { background: #f6f8fa; font-weight: 600; }
+.markdown-body img { max-width: 100%; }
+.markdown-body .task-list-item { list-style: none; }
+.markdown-body .task-list-item input { margin-right: 0.5rem; }
+
+.listing-header { text-align: center; padding: 3rem 1.5rem 1.5rem; background: #f6f8fa; border-bottom: 1px solid #d0d7de; }
+.listing-header h1 { font-size: 2.5rem; font-weight: 700; }
+.listing-header .subtitle { font-weight: 300; color: #57606a; }
+.listing-header .count { color: #57606a; margin-top: 0.5rem; }
+.listing-main { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
+.empty-state { text-align: center; padding: 4rem 1rem; color: #57606a; }
+.empty-state .hint { margin-top: 0.5rem; font-size: 0.9rem; }
+.empty-state code { background: #ebedef; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.85em; }
+.site-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.site-card { display: block; padding: 1.25rem; border: 1px solid #d0d7de; border-radius: 6px; text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.site-card:hover { border-color: #0969da; box-shadow: 0 1px 3px rgba(9,105,218,0.15); }
+.site-name { font-size: 1.1rem; font-weight: 600; color: #0969da; margin-bottom: 0.25rem; }
+.site-desc { font-size: 0.9rem; color: #57606a; margin-bottom: 0.5rem; }
+.site-path { display: block; font-size: 0.8rem; color: #8b949e; font-family: "SFMono-Regular", Consolas, monospace; }
+.site-date { display: block; font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 0.25rem; margin-top: 2rem; padding: 1rem 0; flex-wrap: wrap; }
+.page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; height: 2rem; padding: 0 0.5rem; border: 1px solid #d0d7de; border-radius: 4px; color: #0969da; text-decoration: none; font-size: 0.85rem; transition: background 0.15s; }
+.page-link:hover { background: #f6f8fa; }
+.page-link.active { background: #0969da; color: #fff; border-color: #0969da; }
+.page-link.disabled { color: #8b949e; cursor: default; opacity: 0.6; }
+.page-ellipsis { padding: 0 0.25rem; color: #57606a; }
+
+.error-page { max-width: 600px; margin: 4rem auto; text-align: center; padding: 2rem; }
+.error-page h1 { font-size: 3rem; color: #57606a; }
+.error-page p { margin: 1rem 0; color: #57606a; }
+.error-page .home-link { color: #0969da; text-decoration: none; }
+
+.listing-footer { text-align: center; padding: 2rem 1.5rem; color: #8b949e; font-size: 0.8rem; border-top: 1px solid #d0d7de; margin-top: 2rem; }
