@@ -5,6 +5,7 @@ mod registry;
 mod renderer;
 mod server;
 mod template;
+mod themes;
 
 use clap::Parser;
 use cli::{Cli, Commands};

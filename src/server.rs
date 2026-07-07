@@ -584,29 +584,42 @@ async fn css_handler(
     State(_state): State<AppState>,
     AxumPath(file): AxumPath<String>,
 ) -> Response {
+    // 1. Serve base.css from bundled assets
+    if file == "base.css" {
+        let bundled = include_str!("../css/base.css");
+        return serve_css(bundled);
+    }
+
+    // 2. Try file from ~/.enginemd/css/ (user custom themes)
     let css_dir = config::css_dir();
     let file_path = css_dir.join(&file);
-
     if file_path.exists() {
         return serve_local_file(&file_path).await;
     }
 
+    // 3. Try generated theme from themes.rs
+    let theme_name = file.trim_end_matches(".css");
+    if let Some(theme) = crate::themes::find_theme(theme_name) {
+        let css = crate::themes::render_theme_css(theme);
+        return serve_css(&css);
+    }
+
+    // 4. Try bundled CSS (legacy)
     let bundled = crate::template::bundled_css(&file);
     if !bundled.is_empty() {
-        let mime = if file.ends_with(".css") {
-            "text/css; charset=utf-8"
-        } else {
-            "application/octet-stream"
-        };
-        let headers = {
-            let mut h = HeaderMap::new();
-            h.insert("Content-Type", mime.parse().unwrap());
-            h
-        };
-        return (headers, bundled.to_owned()).into_response();
+        return serve_css(bundled);
     }
 
     (StatusCode::NOT_FOUND, "CSS not found").into_response()
+}
+
+fn serve_css(css: &str) -> Response {
+    let headers = {
+        let mut h = HeaderMap::new();
+        h.insert("Content-Type", "text/css; charset=utf-8".parse().unwrap());
+        h
+    };
+    (headers, css.to_owned()).into_response()
 }
 
 async fn serve_local_file(file_path: &Path) -> Response {

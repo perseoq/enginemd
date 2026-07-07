@@ -109,9 +109,22 @@ pub fn default_settings() -> Settings {
     dependencies.insert("anchor".to_string(), "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js".to_string());
 
     let mut styles = HashMap::new();
-    styles.insert("github".to_string(), "github.css".to_string());
-    styles.insert("dark".to_string(), "dark.css".to_string());
-    styles.insert("simple".to_string(), "simple.css".to_string());
+    let theme_names = [
+        "github", "github-dark", "gitlab", "gitlab-dark",
+        "stackoverflow", "stackoverflow-dark", "readthedocs", "readthedocs-dark",
+        "medium", "hackernews",
+        "material", "material-dark", "tailwind", "bootstrap", "bulma",
+        "shadcn", "shadcn-dark", "windows", "macos",
+        "clean", "white", "typewriter", "paper", "slate", "monochrome", "air", "book", "retro",
+        "nord", "nord-dark", "solarized-light", "solarized-dark",
+        "dracula", "monokai", "gruvbox-light", "gruvbox-dark",
+        "catppuccin-latte", "catppuccin-mocha", "tokyo-night",
+        "ayu-light", "ayu-dark", "rose-pine",
+        "everforest-light", "everforest-dark",
+    ];
+    for name in &theme_names {
+        styles.insert(name.to_string(), format!("{name}.css"));
+    }
 
     Settings {
         port: 10300,

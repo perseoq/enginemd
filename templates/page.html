@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% if title %}{{ title }} &mdash; {% endif %}{{ site_title }}</title>
   {% if base_url %}<base href="{{ base_url }}">{% endif %}
+  <link rel="stylesheet" href="/__enginemd/css/base.css">
   <link rel="stylesheet" href="/__enginemd/css/{{ css_theme }}">
   {% for css in extra_css %}
   <link rel="stylesheet" href="{{ css }}">
