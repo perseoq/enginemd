@@ -230,7 +230,9 @@ Luego usa `[[Otra nota#^mi-bloque]]` o `![[Otra nota#^mi-bloque]]`.
 
 ## Extras de render
 
-- **TOC** plegable y **botón de copiar** en bloques de código (cliente).
+- **TOC** plegable generado en cliente.
+- **Botón de copiar** en la esquina superior derecha de cada bloque de código.
+- **Conmutador de tema** en la barra superior (`Auto → Claro → Oscuro`).
 - **Compresión gzip** de las respuestas.
 - **Healthcheck**: `GET /__enginemd/health`.
 - Los enlaces a `.md` se renderizan como HTML (no se sirve el Markdown crudo).
