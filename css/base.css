@@ -20,7 +20,7 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 .markdown-body ul, .markdown-body ol { margin: 0.75rem 0; padding-left: 2rem; }
 .markdown-body li { margin: 0.25rem 0; }
 .markdown-body hr { margin: 1.5rem 0; border: 0; border-top: 1px solid var(--heading-border); }
-.markdown-body pre { position: relative; margin: 1rem 0; padding: 1rem; background: var(--pre-bg); border: 1px solid var(--pre-border, transparent); border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
+.markdown-body pre { position: relative; margin: 1rem 0; padding: 1rem; background: var(--pre-bg); border: 1px solid var(--pre-border, transparent); border-radius: 6px; overflow-x: auto; font-size: calc(0.85rem + 2pt); }
 .markdown-body code { font-family: var(--font-mono); font-size: 0.85em; padding: 0.2em 0.4em; background: var(--code-bg); border-radius: 3px; }
 .markdown-body pre code { padding: 0; background: none; }
 .markdown-body table { width: 100%; margin: 1rem 0; border-collapse: collapse; }
