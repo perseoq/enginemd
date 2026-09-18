@@ -30,8 +30,8 @@ pub struct AppState {
     pub override_lang: Option<String>,
     pub override_js: Option<Vec<String>>,
     pub override_css: Option<String>,
-    pub override_obsidian: Option<bool>,
     pub vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
+    pub obsidian_detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
 }
 
 pub async fn start_server(
@@ -42,7 +42,6 @@ pub async fn start_server(
     override_lang: Option<String>,
     override_js: Option<Vec<String>>,
     override_css: Option<String>,
-    override_obsidian: Option<bool>,
 ) -> Result<(), String> {
     let (reload_tx, _) = broadcast::channel::<String>(100);
     let templates = Arc::new(TemplateEngine::new(watch_mode));
@@ -56,8 +55,8 @@ pub async fn start_server(
         override_lang,
         override_js,
         override_css,
-        override_obsidian,
         vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
+        obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
     };
 
     let app = Router::new()
@@ -93,8 +92,9 @@ pub async fn start_server(
         };
         let tx = reload_tx.clone();
         let vaults = state.vaults.clone();
+        let detect = state.obsidian_detect.clone();
         tokio::spawn(async move {
-            if let Err(e) = start_file_watcher(dirs, tx, vaults) {
+            if let Err(e) = start_file_watcher(dirs, tx, vaults, detect) {
                 eprintln!("File watcher error: {e}");
             }
         });
@@ -111,6 +111,7 @@ fn start_file_watcher(
     paths: Vec<String>,
     reload_tx: broadcast::Sender<String>,
     vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
+    detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
 ) -> Result<(), String> {
     let (event_tx, event_rx) = std::sync::mpsc::channel::<()>();
 
@@ -160,6 +161,9 @@ fn start_file_watcher(
 
             if let Ok(mut v) = vaults.write() {
                 v.clear();
+            }
+            if let Ok(mut d) = detect.write() {
+                d.clear();
             }
             let _ = reload_tx.send("reload".to_string());
         }
@@ -331,11 +335,7 @@ async fn serve_single_site(
         lang: state.override_lang.as_deref().unwrap_or(&state.settings.lang),
         site_title: &site_name,
         url_prefix: "/".to_string(),
-        obsidian: obsidian_enabled(
-            state.override_obsidian,
-            state.settings.obsidian,
-            site_path,
-        ),
+        obsidian: state.obsidian_enabled(None, site_path),
     };
     serve_internal(state, site_path, sub_path, &config).await
 }
@@ -388,11 +388,7 @@ async fn serve_path_with_config(
         lang,
         site_title: &entry.name,
         url_prefix: format!("/{}/", entry.name),
-        obsidian: obsidian_enabled(
-            state.override_obsidian.or(entry.obsidian),
-            state.settings.obsidian,
-            site_path,
-        ),
+        obsidian: state.obsidian_enabled(entry.obsidian, site_path),
     };
 
     serve_internal(state, site_path, path, &config).await
@@ -407,14 +403,70 @@ struct PageConfig<'a> {
     obsidian: bool,
 }
 
-fn obsidian_enabled(explicit: Option<bool>, global: bool, site_path: &str) -> bool {
-    if let Some(v) = explicit {
-        return v;
+impl AppState {
+    fn obsidian_enabled(&self, explicit: Option<bool>, site_path: &str) -> bool {
+        if let Some(v) = explicit {
+            return v;
+        }
+        if self.settings.obsidian {
+            return true;
+        }
+        if Path::new(site_path).join(".obsidian").is_dir() {
+            return true;
+        }
+        if let Some(v) = self.obsidian_detect.read().unwrap().get(site_path) {
+            return *v;
+        }
+        let detected = site_uses_obsidian_syntax(Path::new(site_path));
+        self.obsidian_detect
+            .write()
+            .unwrap()
+            .insert(site_path.to_string(), detected);
+        detected
     }
-    if global {
-        return true;
+}
+
+fn site_uses_obsidian_syntax(root: &Path) -> bool {
+    const MAX_BYTES: u64 = 8 * 1024 * 1024;
+
+    let mut bytes = 0u64;
+    let mut stack = vec![root.to_path_buf()];
+
+    while let Some(dir) = stack.pop() {
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+            let file_type = match entry.file_type() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let path = entry.path();
+            if file_type.is_dir() {
+                if name == "node_modules" || name == "target" {
+                    continue;
+                }
+                stack.push(path);
+            } else if file_type.is_file() && name.to_ascii_lowercase().ends_with(".md") {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    bytes += content.len() as u64;
+                    if content.contains("![[") || content.contains("[[") {
+                        return true;
+                    }
+                    if bytes >= MAX_BYTES {
+                        return false;
+                    }
+                }
+            }
+        }
     }
-    Path::new(site_path).join(".obsidian").is_dir()
+
+    false
 }
 
 fn get_vault(state: &AppState, site_path: &str) -> Arc<VaultIndex> {
@@ -850,5 +902,24 @@ mod tests {
     fn base_url_only_for_directories() {
         assert_eq!(page_base_url("docs", true), Some("docs/".to_string()));
         assert_eq!(page_base_url("docs/guia", false), None);
+    }
+
+    #[test]
+    fn detects_obsidian_syntax_by_content() {
+        let base = std::env::temp_dir().join(format!("enginemd-obsidian-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+
+        std::fs::write(base.join("plain.md"), "# Plain\n\nSin sintaxis especial.\n").unwrap();
+        assert!(!site_uses_obsidian_syntax(&base));
+
+        std::fs::write(
+            base.join("note.md"),
+            "Texto con una imagen\n\n![[Pasted image 1.png]]\n",
+        )
+        .unwrap();
+        assert!(site_uses_obsidian_syntax(&base));
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

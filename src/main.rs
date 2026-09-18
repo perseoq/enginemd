@@ -76,7 +76,6 @@ async fn main() {
                 cli.lang.clone(),
                 js_override,
                 cli.css_support.clone(),
-                cli.obsidian.then_some(true),
             )
             .await
             {

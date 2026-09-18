@@ -183,9 +183,6 @@ mod imp {
             args.push("--css-support".to_string());
             args.push(c.clone());
         }
-        if cli.obsidian {
-            args.push("--obsidian".to_string());
-        }
         args
     }
 

@@ -47,7 +47,6 @@ enginemd --port 8080                # Puerto personalizado
 enginemd --js-support mathjax,mermaid,chartjs  # Librerías JS
 enginemd --css-support dark         # Tema CSS
 enginemd --lang es                  # Idioma
-enginemd --obsidian                 # Modo Obsidian (wikilinks/embeds)
 ```
 
 ## Modo daemon
@@ -62,7 +61,7 @@ enginemd daemon stop      # detiene y desactiva el autoarranque
 enginemd daemon restart
 ```
 
-Los flags globales (`--port`, `--path`, `--lang`, `--obsidian`, ...) se reenvían
+Los flags globales (`--port`, `--path`, `--lang`, ...) se reenvían
 al daemon. PID y log en `~/.enginemd/enginemd.pid` y `~/.enginemd/enginemd.log`.
 Ver `MANUAL_DAEMON.md`.
 
@@ -114,8 +113,9 @@ encabezados `[[Nota#Sección]]`, enlaces a bloques `[[Nota#^id]]`, e
 incrustaciones `![[imagen.png|640x480]]` y `![[Nota]]`. La resolución es por
 nombre en todo el sitio, como en Obsidian.
 
-Se activa automáticamente si el sitio contiene una carpeta `.obsidian/`, o con
-`--obsidian`. Ver `MANUAL_OBSIDIAN.md`.
+Se activa automáticamente, sin configuración: si el sitio tiene una carpeta
+`.obsidian/` o si su contenido usa sintaxis Obsidian (`[[...]]` o `![[...]]`).
+Ver `MANUAL_OBSIDIAN.md`.
 
 ## Temas CSS
 
