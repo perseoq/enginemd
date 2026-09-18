@@ -1,14 +1,33 @@
 <!DOCTYPE html>
-<html lang="{{ lang }}">
+<html lang="{{ lang }}"{% if theme_attr %} data-theme="{{ theme_attr }}"{% endif %} data-theme-source="{{ theme_source }}"{% if theme_default %} data-theme-default="{{ theme_default }}"{% endif %}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>EngineMD - Sites</title>
   <link rel="stylesheet" href="/__enginemd/css/base.css">
   <link rel="stylesheet" href="/__enginemd/css/{{ listing_css }}">
+  <script>
+    (function() {
+      var root = document.documentElement;
+      try {
+        var saved = localStorage.getItem('enginemd-theme');
+        if (saved === 'light' || saved === 'dark') { root.setAttribute('data-theme', saved); return; }
+      } catch (e) {}
+      var source = root.getAttribute('data-theme-source');
+      var def = root.getAttribute('data-theme-default');
+      if (source === 'auto' && def) {
+        var h = location.hostname;
+        if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]') {
+          root.setAttribute('data-theme', def);
+        }
+      }
+    })();
+  </script>
 </head>
 <body>
   <header class="listing-header">
+    <button id="theme-toggle" class="theme-toggle" type="button" title="Tema">Auto</button>
     <h1>EngineMD <span class="subtitle">Sites</span></h1>
     <p class="count">{{ total }} site(s) registered</p>
   </header>
@@ -79,5 +98,42 @@
   <footer class="listing-footer">
     <p>EngineMD &mdash; Markdown to HTML server</p>
   </footer>
+  <script>
+    (function() {
+      var root = document.documentElement;
+      var toggle = document.getElementById('theme-toggle');
+      if (!toggle) { return; }
+      var labels = { auto: 'Auto', light: 'Claro', dark: 'Oscuro' };
+      var order = ['auto', 'light', 'dark'];
+      function current() {
+        var s = null;
+        try { s = localStorage.getItem('enginemd-theme'); } catch (e) {}
+        return (s === 'light' || s === 'dark') ? s : 'auto';
+      }
+      function isLocal() {
+        var h = location.hostname;
+        return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
+      }
+      function apply(mode) {
+        if (mode === 'auto') {
+          try { localStorage.removeItem('enginemd-theme'); } catch (e) {}
+          var source = root.getAttribute('data-theme-source');
+          var def = root.getAttribute('data-theme-default');
+          if (source === 'system' && def) { root.setAttribute('data-theme', def); }
+          else if (source === 'auto' && def && isLocal()) { root.setAttribute('data-theme', def); }
+          else { root.removeAttribute('data-theme'); }
+        } else {
+          try { localStorage.setItem('enginemd-theme', mode); } catch (e) {}
+          root.setAttribute('data-theme', mode);
+        }
+        toggle.textContent = labels[mode];
+      }
+      toggle.textContent = labels[current()];
+      toggle.addEventListener('click', function() {
+        var m = current();
+        apply(order[(order.indexOf(m) + 1) % order.length]);
+      });
+    })();
+  </script>
 </body>
 </html>

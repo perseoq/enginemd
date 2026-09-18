@@ -8,6 +8,7 @@ mod project;
 mod registry;
 mod renderer;
 mod server;
+mod system_theme;
 mod template;
 mod themes;
 

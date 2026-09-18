@@ -152,6 +152,11 @@ async fn build_site(
                 &inline,
                 &body_scripts,
                 false,
+                &crate::template::ThemeContext {
+                    source: "browser".to_string(),
+                    default: None,
+                    attr: None,
+                },
             );
             let html = rewrite_md_links(&html);
 

@@ -30,6 +30,8 @@ pub struct Settings {
     pub cdn_base: Option<String>,
     #[serde(default)]
     pub cdn_fallbacks: Vec<String>,
+    #[serde(default = "default_theme_source")]
+    pub theme_source: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -61,6 +63,9 @@ fn default_active() -> bool {
 }
 fn default_true() -> bool {
     true
+}
+fn default_theme_source() -> String {
+    "auto".to_string()
 }
 
 pub fn enginemd_dir() -> PathBuf {
@@ -218,6 +223,7 @@ pub fn default_settings() -> Settings {
         assets_dir: None,
         cdn_base: None,
         cdn_fallbacks: Vec::new(),
+        theme_source: "auto".to_string(),
     }
 }
 

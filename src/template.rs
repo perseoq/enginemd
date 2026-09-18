@@ -32,6 +32,7 @@ impl TemplateEngine {
         total: usize,
         page_start: usize,
         page_end: usize,
+        theme: &ThemeContext,
     ) -> String {
         let mut ctx = Context::new();
         ctx.insert("lang", lang);
@@ -42,6 +43,7 @@ impl TemplateEngine {
         ctx.insert("total", &total);
         ctx.insert("page_start", &page_start);
         ctx.insert("page_end", &page_end);
+        insert_theme(&mut ctx, theme);
 
         self.tera
             .render("listing", &ctx)
@@ -66,6 +68,7 @@ impl TemplateEngine {
         head_inline: &[String],
         body_scripts: &[crate::assets::ScriptAsset],
         watch_mode: bool,
+        theme: &ThemeContext,
     ) -> String {
         let mut ctx = Context::new();
         ctx.insert("title", &title);
@@ -83,23 +86,46 @@ impl TemplateEngine {
         ctx.insert("head_inline", head_inline);
         ctx.insert("body_scripts", body_scripts);
         ctx.insert("watch_mode", &watch_mode);
+        insert_theme(&mut ctx, theme);
 
         self.tera
             .render("page", &ctx)
             .unwrap_or_else(|e| format!("<h1>Template error</h1><p>{e}</p>"))
     }
 
-    pub fn render_error(&self, status: u16, message: &str, lang: &str, css_theme: &str) -> String {
+    pub fn render_error(
+        &self,
+        status: u16,
+        message: &str,
+        lang: &str,
+        css_theme: &str,
+        theme: &ThemeContext,
+    ) -> String {
         let mut ctx = Context::new();
         ctx.insert("status", &status);
         ctx.insert("message", message);
         ctx.insert("lang", lang);
         ctx.insert("css_theme", css_theme);
+        insert_theme(&mut ctx, theme);
 
         self.tera.render("error", &ctx).unwrap_or_else(|e| {
             format!("<h1>{status}</h1><p>{message}</p><p>Template error: {e}</p>")
         })
     }
+}
+
+/// Theme values injected into the HTML: source (`auto`/`system`/`browser`),
+/// the OS-detected default and the effective `data-theme` attribute.
+pub struct ThemeContext {
+    pub source: String,
+    pub default: Option<String>,
+    pub attr: Option<String>,
+}
+
+fn insert_theme(ctx: &mut Context, theme: &ThemeContext) {
+    ctx.insert("theme_source", &theme.source);
+    ctx.insert("theme_default", &theme.default);
+    ctx.insert("theme_attr", &theme.attr);
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

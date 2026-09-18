@@ -269,17 +269,30 @@ estático.
 
 ## Tema automático (claro/oscuro)
 
-El tema se adapta al sistema, sin flags ni configuración:
+El tema se adapta solo, sin flags:
 
-- **Sistema en modo claro** → **Visual Studio Light** (paleta de VS Code Light+).
-- **Sistema en modo oscuro** → **Dracula** (paleta de VS Code).
+- **Claro** → **Visual Studio Light** (VS Code Light+).
+- **Oscuro** → **Dracula** (VS Code).
 
-Se implementa con `@media (prefers-color-scheme: dark)`: el navegador elige
-automáticamente según la preferencia del sistema operativo. También se adapta
-el resaltado de código (syntect) y los callouts.
+Fuente del tema (`theme_source` en `settings.json`):
 
-El catálogo de temas en `themes.rs` se conserva, pero la página siempre usa el
-tema automático (`auto.css`).
+| Valor | Comportamiento |
+|-------|----------------|
+| `auto` (por defecto) | Cliente **local** → tema del SO; cliente **remoto** → tema del navegador |
+| `system` | Siempre el tema del SO del servidor |
+| `browser` | Siempre `prefers-color-scheme` del navegador |
+
+El servidor detecta el tema del escritorio en Linux (`gsettings`/portal/GTK) y
+lo inyecta como `data-theme`; para clientes remotos no lo impone (usa el
+navegador). En **Windows/macOS** el navegador ya sigue al sistema.
+
+Además hay un **conmutador** en la barra superior (`Auto → Claro → Oscuro`),
+persistido en el navegador, para forzar el tema. También se adaptan el
+resaltado de código (syntect) y los callouts.
+
+Si el escritorio está en claro pero quieres oscuro sin tocar el sistema, usa el
+conmutador o pon `theme_source` y el escritorio en oscuro
+(`gsettings set org.gnome.desktop.interface color-scheme prefer-dark`).
 
 ## Configuración global
 
@@ -294,6 +307,7 @@ tema automático (`auto.css`).
   "obsidian": false,
   "auto_fetch": true,
   "sri": true,
+  "theme_source": "auto",
   "assets_dir": "/home/user/.enginemd",
   "cdn_base": "https://cdn.jsdelivr.net/npm",
   "cdn_fallbacks": ["https://unpkg.com"],

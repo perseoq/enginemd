@@ -35,6 +35,7 @@ pub struct AppState {
     pub obsidian_detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
     pub assets: Arc<AssetManager>,
     pub assets_base: std::path::PathBuf,
+    pub theme_cache: Arc<crate::system_theme::ThemeCache>,
 }
 
 pub async fn start_server(
@@ -64,6 +65,9 @@ pub async fn start_server(
             settings.cdn_fallbacks.clone(),
         )),
         assets_base: config::assets_base(&settings),
+        theme_cache: Arc::new(crate::system_theme::ThemeCache::new(
+            std::time::Duration::from_secs(2),
+        )),
     };
 
     if settings.auto_fetch {
@@ -307,6 +311,7 @@ async fn listing_handler(state: &AppState, page_param: Option<&String>) -> Respo
         total,
         page_start,
         page_end,
+        &theme_ctx(state),
     );
 
     Html(html).into_response()
@@ -388,6 +393,7 @@ async fn catch_all_handler(
                 &format!("Site '{}' not found or inactive.", site_name),
                 &state.settings.lang,
                 "auto.css",
+                &theme_ctx(&state),
             );
             (StatusCode::NOT_FOUND, Html(html)).into_response()
         }
@@ -420,6 +426,20 @@ struct PageConfig<'a> {
     url_prefix: String,
     asset_prefix: String,
     obsidian: bool,
+}
+
+fn theme_ctx(state: &AppState) -> crate::template::ThemeContext {
+    let source = state.settings.theme_source.to_lowercase();
+    let os = state
+        .theme_cache
+        .get()
+        .map(|dark| if dark { "dark" } else { "light" }.to_string());
+    let attr = if source == "system" { os.clone() } else { None };
+    crate::template::ThemeContext {
+        source,
+        default: os,
+        attr,
+    }
 }
 
 impl AppState {
@@ -527,6 +547,7 @@ async fn serve_internal(
             "No index.md or init.md found in this site.",
             config.lang,
             &css_file,
+            &theme_ctx(state),
         );
         return (StatusCode::NOT_FOUND, Html(html)).into_response();
     }
@@ -568,6 +589,7 @@ async fn serve_internal(
         &format!("Page '{}' not found.", path),
         config.lang,
         &css_file,
+        &theme_ctx(state),
     );
     (StatusCode::NOT_FOUND, Html(html)).into_response()
 }
@@ -634,6 +656,7 @@ async fn render_file(
                 &format!("Cannot read file: {e}"),
                 config.lang,
                 &css_file,
+                &theme_ctx(state),
             );
             return (StatusCode::INTERNAL_SERVER_ERROR, Html(html)).into_response();
         }
@@ -696,6 +719,7 @@ async fn render_file(
         &js_assets.head_inline,
         &js_assets.body_scripts,
         state.watch_mode,
+        &theme_ctx(state),
     );
 
     Html(html).into_response()
@@ -995,6 +1019,9 @@ mod tests {
             obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
             assets: Arc::new(AssetManager::new(base.clone(), None, Vec::new())),
             assets_base: base,
+            theme_cache: Arc::new(crate::system_theme::ThemeCache::new(
+                std::time::Duration::from_secs(2),
+            )),
         }
     }
 
@@ -1036,8 +1063,23 @@ mod tests {
             get(build_router(test_state()), "/__enginemd/css/auto.css").await;
         assert_eq!(status, StatusCode::OK);
         assert!(body.contains("prefers-color-scheme: dark"));
+        assert!(body.contains(":root[data-theme=\"dark\"]"));
         assert!(body.contains("#282a36"));
         assert!(body.contains("#ffffff"));
+    }
+
+    #[tokio::test]
+    async fn page_includes_theme_toggle() {
+        let site = std::env::temp_dir().join(format!("enginemd-theme-{}", std::process::id()));
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.md"), "# Hi\n").unwrap();
+        let mut state = test_state();
+        state.override_path = Some(site.to_string_lossy().to_string());
+        let (status, _headers, body) = get(build_router(state), "/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("id=\"theme-toggle\""));
+        assert!(body.contains("data-theme-source="));
+        assert!(body.contains("color-scheme"));
     }
 
     #[tokio::test]

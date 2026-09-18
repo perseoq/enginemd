@@ -20,7 +20,7 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 .markdown-body ul, .markdown-body ol { margin: 0.75rem 0; padding-left: 2rem; }
 .markdown-body li { margin: 0.25rem 0; }
 .markdown-body hr { margin: 1.5rem 0; border: 0; border-top: 1px solid var(--heading-border); }
-.markdown-body pre { margin: 1rem 0; padding: 1rem; background: var(--pre-bg); border: 1px solid var(--pre-border, transparent); border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
+.markdown-body pre { position: relative; margin: 1rem 0; padding: 1rem; background: var(--pre-bg); border: 1px solid var(--pre-border, transparent); border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
 .markdown-body code { font-family: var(--font-mono); font-size: 0.85em; padding: 0.2em 0.4em; background: var(--code-bg); border-radius: 3px; }
 .markdown-body pre code { padding: 0; background: none; }
 .markdown-body table { width: 100%; margin: 1rem 0; border-collapse: collapse; }
@@ -132,3 +132,10 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
   .markdown-body .callout-danger, .markdown-body .callout-error { border-left-color: #ff5555; background: rgba(255,85,85,0.08); }
   .markdown-body .callout-important { border-left-color: #bd93f9; background: rgba(189,147,249,0.08); }
 }
+
+/* Theme toggle */
+.top-bar .theme-toggle { margin-left: auto; }
+.theme-toggle { font-size: 0.75rem; padding: 0.2rem 0.6rem; border: 1px solid var(--topbar-border); border-radius: 4px; background: var(--body-bg); color: var(--body-text); cursor: pointer; }
+.theme-toggle:hover { border-color: var(--link); color: var(--link); }
+.listing-header { position: relative; }
+.listing-header .theme-toggle { position: absolute; top: 1rem; right: 1rem; }

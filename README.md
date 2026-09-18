@@ -9,7 +9,7 @@ y soporte de bóvedas de Obsidian.
 ## Características
 
 - Markdown (comrak) con tablas, notas al pie, tasklists y autolinks.
-- **Tema automático** según el sistema: claro = VS Code Light+, oscuro = Dracula.
+- **Tema automático**: claro = VS Code Light+, oscuro = Dracula; detecta el tema del PC y tiene conmutador.
 - Resaltado de código en servidor (syntect).
 - **Assets self-hosted**: MathJax, KaTeX, Mermaid, Chart.js, highlight, anchor y
   Font Awesome se descargan y se sirven localmente (funciona offline).

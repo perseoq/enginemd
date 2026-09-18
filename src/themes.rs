@@ -130,14 +130,17 @@ pub fn render_theme_css(theme: &Theme) -> String {
 }
 
 /// Theme that follows the OS color scheme: VS Code Light+ in light mode and
-/// Dracula (VSCode) in dark mode.
+/// Dracula (VSCode) in dark mode. The `data-theme` attribute (injected by the
+/// server) wins over `prefers-color-scheme`.
 pub fn render_auto_theme_css() -> String {
     let light = find_theme("vs-light").expect("vs-light theme");
     let dark = find_theme("dracula").expect("dracula theme");
+    let light_vars = theme_vars(light);
+    let dark_vars = theme_vars(dark);
     format!(
-        ":root {{{}}}\n@media (prefers-color-scheme: dark) {{\n  :root {{{}}}\n}}\n",
-        theme_vars(light),
-        theme_vars(dark)
+        ":root, :root[data-theme=\"light\"] {{\n  color-scheme: light dark;{light_vars}}}\n\
+         :root[data-theme=\"dark\"] {{{dark_vars}}}\n\
+         @media (prefers-color-scheme: dark) {{\n  :root:not([data-theme]) {{{dark_vars}}}\n}}\n",
     )
 }
 
@@ -974,9 +977,12 @@ mod tests {
     fn auto_theme_switches_light_and_dark() {
         let css = render_auto_theme_css();
         assert!(css.contains("prefers-color-scheme: dark"));
+        assert!(css.contains(":root[data-theme=\"dark\"]"));
+        assert!(css.contains(":root[data-theme=\"light\"]"));
+        assert!(css.contains(":root:not([data-theme])"));
+        assert!(css.contains("color-scheme: light dark"));
         assert!(css.contains("#ffffff")); // VS Code Light+ background
         assert!(css.contains("#282a36")); // Dracula background
-        assert!(css.contains("--body-bg"));
     }
 
     #[test]
