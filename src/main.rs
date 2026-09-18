@@ -1,3 +1,4 @@
+mod assets;
 mod cli;
 mod config;
 mod daemon;
@@ -47,8 +48,8 @@ async fn main() {
                 std::process::exit(1);
             }
         }
-        Some(Commands::Fetch) => {
-            if let Err(e) = registry::cmd_fetch().await {
+        Some(Commands::Fetch { force }) => {
+            if let Err(e) = registry::cmd_fetch(*force).await {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }

@@ -14,6 +14,7 @@ use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
 
+use crate::assets::{self, AssetManager, CssAsset, FileKind, Position, ScriptAsset};
 use crate::config::{self, DirectoryEntry, Settings};
 use crate::obsidian::VaultIndex;
 use crate::renderer::{self, render_markdown, Frontmatter, RenderContext};
@@ -32,6 +33,7 @@ pub struct AppState {
     pub override_css: Option<String>,
     pub vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
     pub obsidian_detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
+    pub assets: Arc<AssetManager>,
 }
 
 pub async fn start_server(
@@ -57,7 +59,15 @@ pub async fn start_server(
         override_css,
         vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
         obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
+        assets: Arc::new(AssetManager::new(config::enginemd_dir())),
     };
+
+    if settings.auto_fetch {
+        let assets = state.assets.clone();
+        tokio::spawn(async move {
+            assets.prefetch_all().await;
+        });
+    }
 
     let app = Router::new()
         .route("/", get(listing_or_single_handler))
@@ -379,7 +389,7 @@ async fn serve_path_with_config(
 ) -> Response {
     let site_path = &entry.path;
     let css = entry.css.as_deref().unwrap_or("github");
-    let js_support = entry.js_support.as_ref();
+    let js_support = state.override_js.as_ref().or(entry.js_support.as_ref());
     let lang = entry.lang.as_deref().unwrap_or(&state.settings.lang);
 
     let config = PageConfig {
@@ -636,7 +646,7 @@ async fn render_file(
     let description = fm.description.as_deref();
     let page_lang = fm.lang.as_deref().unwrap_or(config.lang);
 
-    let js_assets = resolve_js(&state.settings.dependencies, config.js_support, config.css);
+    let js_assets = resolve_assets(state, config, &content).await;
 
     let css_file = state.settings.styles
         .get(config.css)
@@ -661,121 +671,95 @@ async fn render_file(
     Html(html).into_response()
 }
 
+#[derive(Default)]
 struct JsAssets {
-    head_scripts: Vec<String>,   // <script src="...">
-    head_inline: Vec<String>,    // raw <script>...</script> HTML
-    body_scripts: Vec<String>,   // <script src="..."> before </body>
-    extra_css: Vec<String>,      // <link rel="stylesheet" href="...">
+    head_scripts: Vec<ScriptAsset>,
+    head_inline: Vec<String>,
+    body_scripts: Vec<ScriptAsset>,
+    extra_css: Vec<CssAsset>,
 }
 
-fn resolve_js(
-    dep_map: &std::collections::HashMap<String, String>,
-    js_support: Option<&Vec<String>>,
-    css_theme: &str,
-) -> JsAssets {
-    let mut assets = JsAssets {
-        head_scripts: Vec::new(),
-        head_inline: Vec::new(),
-        body_scripts: Vec::new(),
-        extra_css: Vec::new(),
-    };
+async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -> JsAssets {
+    let mut out = JsAssets::default();
+    let sri = state.settings.sri;
 
-    let js_keys: Vec<&String> = js_support
-        .map(|list| list.iter().filter(|k| dep_map.contains_key(*k)).collect())
+    let allow: std::collections::HashSet<&str> = config
+        .js_support
+        .map(|list| list.iter().map(|s| s.as_str()).collect())
         .unwrap_or_default();
 
-    for key in &js_keys {
-        let url = cdn_or_local(key, dep_map);
+    // Detection activates libraries even if they are not explicitly listed.
+    let mut needed: std::collections::HashSet<&'static str> =
+        assets::detect_assets(body).into_iter().collect();
+    for key in &allow {
+        match assets::find(key) {
+            Some(spec) => {
+                needed.insert(spec.key);
+            }
+            None => warn!("unknown js-support key: {key}"),
+        }
+    }
 
-        match key.as_str() {
-            "mermaid" => {
-                assets.head_inline.push(
-                    "<script>document.addEventListener('DOMContentLoaded',function(){typeof mermaid!=='undefined'&&mermaid.initialize({startOnLoad:true});});</script>".to_string()
-                );
-                assets.body_scripts.push(url);
+    // mathjax and katex are mutually exclusive; explicit selection wins.
+    if needed.contains("mathjax") && needed.contains("katex") {
+        if allow.contains("katex") && !allow.contains("mathjax") {
+            needed.remove("mathjax");
+        } else {
+            needed.remove("katex");
+        }
+    }
+
+    let hl_css = if config.css.contains("dark") {
+        "highlight-github-dark.css"
+    } else {
+        "highlight-github.css"
+    };
+
+    for key in needed {
+        let spec = match assets::find(key) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        for file in spec.files {
+            // Only load the highlight CSS matching the active theme.
+            if spec.key == "highlight" && file.kind == FileKind::Css && file.local != hl_css {
+                continue;
             }
-            "highlight" => {
-                let hl_theme = if css_theme.contains("dark") { "github-dark" } else { "github" };
-                assets.extra_css.push(format!(
-                    "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/styles/{hl_theme}.min.css"
-                ));
-                assets.head_inline.push(
-                    "<script>document.addEventListener('DOMContentLoaded',function(){typeof hljs!=='undefined'&&hljs.highlightAll();});</script>".to_string()
-                );
-                assets.head_scripts.push(url);
-            }
-            "mathjax" => {
-                assets.head_inline.push(
-                    "<script>window.MathJax={tex:{inlineMath:[['$','$'],['\\\\(','\\\\)']],displayMath:[['$$','$$'],['\\\\[','\\\\]']]}};</script>".to_string()
-                );
-                assets.head_scripts.push(url);
-            }
-            "katex" => {
-                assets.extra_css.push("https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css".to_string());
-                assets.head_scripts.push(url);
-                assets.head_scripts.push("https://cdn.jsdelivr.net/npm/katex@0.16/dist/contrib/auto-render.min.js".to_string());
-                assets.head_inline.push(
-                    "<script>document.addEventListener('DOMContentLoaded',function(){typeof renderMathInElement!=='undefined'&&renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\\\[',right:'\\\\]',display:true},{left:'$',right:'$',display:false},{left:'\\\\(',right:'\\\\)',display:false}]});});</script>".to_string()
-                );
-            }
-            "anchor" => {
-                assets.head_inline.push(
-                    "<script>document.addEventListener('DOMContentLoaded',function(){typeof anchors!=='undefined'&&anchors.add('.markdown-body h2,.markdown-body h3,.markdown-body h4');});</script>".to_string()
-                );
-                assets.head_scripts.push(url);
-            }
-            "chartjs" => {
-                assets.body_scripts.push(url);
-            }
-            "fontawesome" => {
-                assets.extra_css.push(url);
-            }
-            _ => {
-                if url.ends_with(".css") {
-                    assets.extra_css.push(url);
-                } else {
-                    assets.head_scripts.push(url);
+
+            let hash = match state.assets.ensure(file.url, file.local, file.kind).await {
+                Ok(h) => h,
+                Err(e) => {
+                    warn!("asset '{}' ({}) unavailable: {e}", spec.key, file.local);
+                    continue;
                 }
+            };
+            let integrity = if sri { Some(hash) } else { None };
+
+            match file.kind {
+                FileKind::Js => {
+                    let script = ScriptAsset {
+                        src: format!("/__enginemd/js/{}", file.local),
+                        integrity,
+                    };
+                    match spec.position {
+                        Position::Head => out.head_scripts.push(script),
+                        Position::Body => out.body_scripts.push(script),
+                    }
+                }
+                FileKind::Css => out.extra_css.push(CssAsset {
+                    href: format!("/__enginemd/css/{}", file.local),
+                    integrity,
+                }),
             }
         }
-    }
 
-    assets
-}
-
-fn cdn_or_local(key: &str, dep_map: &std::collections::HashMap<String, String>) -> String {
-    static KNOWN_CDN: &[(&str, &str)] = &[
-        ("mathjax", "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"),
-        ("mermaid", "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"),
-        ("chartjs", "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"),
-        ("highlight", "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js"),
-        ("katex", "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"),
-        ("katex_css", "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css"),
-        ("fontawesome", "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css"),
-        ("anchor", "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js"),
-    ];
-
-    let value = dep_map.get(key);
-
-    // Prefer a locally fetched copy when one exists.
-    if let Some(v) = value {
-        let local = config::dep_local_name(key, v);
-        if config::js_dir().join(&local).exists() {
-            return format!("/__enginemd/js/{local}");
+        for init in spec.init {
+            out.head_inline.push(init.to_string());
         }
     }
 
-    // Known library -> canonical CDN URL.
-    if let Some((_, cdn)) = KNOWN_CDN.iter().find(|(k, _)| *k == key) {
-        return cdn.to_string();
-    }
-
-    // Otherwise use the value from settings.
-    match value {
-        Some(v) if v.starts_with("http://") || v.starts_with("https://") => v.clone(),
-        Some(v) => format!("/__enginemd/js/{}", config::dep_local_name(key, v)),
-        None => format!("/__enginemd/js/{key}.js"),
-    }
+    out
 }
 
 async fn serve_static_file(path: &Path) -> Response {

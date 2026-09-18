@@ -47,8 +47,11 @@ pub enum Commands {
     Down {
         name: String,
     },
-    #[command(about = "Download JS/CSS dependencies from CDN")]
-    Fetch,
+    #[command(about = "Download JS/CSS dependencies")]
+    Fetch {
+        #[arg(long, help = "Re-download assets even if already cached")]
+        force: bool,
+    },
     #[command(about = "Manage the background daemon")]
     Daemon {
         #[command(subcommand)]

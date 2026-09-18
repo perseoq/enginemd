@@ -31,7 +31,7 @@ enginemd --watch
 | `enginemd new <name>` | Crea un sitio nuevo en `~/.enginemd/sites/<name>/` |
 | `enginemd up <path>` | Registra un directorio existente como sitio |
 | `enginemd down <name>` | Elimina un sitio del listado |
-| `enginemd fetch` | Descarga librerías JS/CSS desde CDN |
+| `enginemd fetch [--force]` | Descarga las librerías JS/CSS al caché local |
 | `enginemd` | Inicia servidor en `0.0.0.0:10300` |
 | `enginemd --watch` | Inicia servidor dev en `0.0.0.0:9696` con hot-reload |
 | `enginemd daemon start` | Inicia el servidor en segundo plano (persiste al reiniciar) |
@@ -44,10 +44,28 @@ enginemd --watch
 ```bash
 enginemd --path /ruta               # Sirve un solo directorio
 enginemd --port 8080                # Puerto personalizado
-enginemd --js-support mathjax,mermaid,chartjs  # Librerías JS
+enginemd --js-support mathjax,mermaid,chartjs  # Librerías JS (allowlist)
 enginemd --css-support dark         # Tema CSS
 enginemd --lang es                  # Idioma
 ```
+
+## Assets JS/CSS (self-hosted)
+
+Todas las librerías se **descargan y se sirven localmente**; la página nunca
+carga desde un CDN. Al arrancar, `auto_fetch` descarga lo que falte en segundo
+plano (y también se descarga bajo demanda si falta). Los archivos se guardan en
+`~/.enginemd/js` y `~/.enginemd/css`, con un manifest de hashes SRI en
+`~/.enginemd/assets.json`.
+
+- **Detección automática**: cada página carga solo lo que usa (```mermaid,
+  ```chart, `$...$`, etc.), aunque no esté en `--js-support`.
+- `--js-support` es una **allowlist** de claves del catálogo (override global).
+- **SRI** activo por defecto (`sri: false` para desactivarlo) y `defer`.
+- Si un asset no está y no se puede descargar, se **avisa y se omite**.
+- `enginemd fetch --force` fuerza la re-descarga.
+
+Catálogo actual: `mathjax`, `katex`, `mermaid`, `chartjs`, `highlight`, `anchor`,
+`fontawesome`. El resaltado de código es server-side (syntect) por defecto.
 
 ## Modo daemon
 
@@ -146,15 +164,8 @@ Se configuran por sitio en `~/.enginemd/settings.json`:
   "lang": "en",
   "listing_css": "github",
   "listing_per_page": 20,
-  "dependencies": {
-    "mathjax": "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js",
-    "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js",
-    "chartjs": "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js",
-    "highlight": "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js",
-    "katex": "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js",
-    "fontawesome": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css",
-    "anchor": "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js"
-  },
+  "auto_fetch": true,
+  "sri": true,
   "styles": {
     "github": "github.css",
     "dark": "dark.css",
@@ -170,5 +181,5 @@ Se configuran por sitio en `~/.enginemd/settings.json`:
 ## Stack técnico
 
 - **Rust** con axum, comrak, syntect, tera, clap
-- Librerías JS cargadas desde CDN (jsdelivr)
+- Librerías JS/CSS **descargadas y servidas localmente** (offline), con SRI
 - CSS themes embehidos en el binario (github, dark, simple)

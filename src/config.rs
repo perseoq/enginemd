@@ -22,6 +22,10 @@ pub struct Settings {
     pub directories: Vec<DirectoryEntry>,
     #[serde(default)]
     pub obsidian: bool,
+    #[serde(default = "default_true")]
+    pub auto_fetch: bool,
+    #[serde(default = "default_true")]
+    pub sri: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -43,6 +47,7 @@ fn default_lang() -> String { "en".to_string() }
 fn default_listing_css() -> String { "github".to_string() }
 fn default_listing_per_page() -> usize { 20 }
 fn default_active() -> bool { true }
+fn default_true() -> bool { true }
 
 pub fn enginemd_dir() -> PathBuf {
     let home = std::env::var("HOME")
@@ -73,18 +78,6 @@ pub fn pid_path() -> PathBuf {
 
 pub fn log_path() -> PathBuf {
     enginemd_dir().join("enginemd.log")
-}
-
-pub fn dep_local_name(key: &str, value: &str) -> String {
-    let ext = value
-        .rsplit('/')
-        .next()
-        .and_then(|seg| seg.rsplit_once('.').map(|(_, e)| e))
-        .filter(|e| {
-            !e.is_empty() && e.len() <= 5 && e.chars().all(|c| c.is_ascii_alphanumeric())
-        })
-        .unwrap_or("js");
-    format!("{key}.{ext}")
 }
 
 pub fn load_settings() -> Settings {
@@ -160,6 +153,8 @@ pub fn default_settings() -> Settings {
         styles,
         directories: Vec::new(),
         obsidian: false,
+        auto_fetch: true,
+        sri: true,
     }
 }
 

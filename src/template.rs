@@ -56,10 +56,10 @@ impl TemplateEngine {
         lang: &str,
         css_theme: &str,
         base_url: Option<&str>,
-        extra_css: &[String],
-        head_scripts: &[String],
+        extra_css: &[crate::assets::CssAsset],
+        head_scripts: &[crate::assets::ScriptAsset],
         head_inline: &[String],
-        body_scripts: &[String],
+        body_scripts: &[crate::assets::ScriptAsset],
         watch_mode: bool,
     ) -> String {
         let mut ctx = Context::new();

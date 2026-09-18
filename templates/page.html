@@ -8,13 +8,13 @@
   <link rel="stylesheet" href="/__enginemd/css/base.css">
   <link rel="stylesheet" href="/__enginemd/css/{{ css_theme }}">
   {% for css in extra_css %}
-  <link rel="stylesheet" href="{{ css }}">
+  <link rel="stylesheet" href="{{ css.href }}"{% if css.integrity %} integrity="{{ css.integrity }}"{% endif %}>
   {% endfor %}
   {% for raw in head_inline %}
   {{ raw | safe }}
   {% endfor %}
   {% for js in head_scripts %}
-  <script src="{{ js }}"></script>
+  <script src="{{ js.src }}"{% if js.integrity %} integrity="{{ js.integrity }}"{% endif %} defer></script>
   {% endfor %}
 </head>
 <body>
@@ -28,7 +28,7 @@
     {{ content | safe }}
   </main>
   {% for js in body_scripts %}
-  <script src="{{ js }}"></script>
+  <script src="{{ js.src }}"{% if js.integrity %} integrity="{{ js.integrity }}"{% endif %}></script>
   {% endfor %}
   {% if watch_mode %}
   <script>
