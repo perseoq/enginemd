@@ -9,7 +9,7 @@ use crate::obsidian::VaultIndex;
 use crate::renderer::{self, Frontmatter, RenderContext};
 use crate::template::TemplateEngine;
 
-type SiteEntry = (String, PathBuf, Option<String>, Option<Vec<String>>);
+type SiteEntry = (String, PathBuf, Option<Vec<String>>);
 
 pub async fn cmd_build(out: &str, path: Option<&str>) -> Result<(), String> {
     let settings = config::load_settings();
@@ -38,21 +38,16 @@ pub async fn cmd_build(out: &str, path: Option<&str>) -> Result<(), String> {
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| "site".to_string());
-        sites.push((name, pb, None, None));
+        sites.push((name, pb, None));
     } else {
         for d in &settings.directories {
             if d.active {
-                sites.push((
-                    d.name.clone(),
-                    PathBuf::from(&d.path),
-                    d.css.clone(),
-                    d.js_support.clone(),
-                ));
+                sites.push((d.name.clone(), PathBuf::from(&d.path), d.js_support.clone()));
             }
         }
     }
 
-    for (name, root, css, js_support) in &sites {
+    for (name, root, js_support) in &sites {
         let index = VaultIndex::build(root);
         let obsidian = settings.obsidian
             || root.join(".obsidian").is_dir()
@@ -65,7 +60,6 @@ pub async fn cmd_build(out: &str, path: Option<&str>) -> Result<(), String> {
             &out_root,
             name,
             root,
-            css.as_deref(),
             js_support.as_deref(),
             obsidian,
             &index,
@@ -85,17 +79,12 @@ async fn build_site(
     out_root: &Path,
     name: &str,
     root: &Path,
-    site_css: Option<&str>,
     site_js: Option<&[String]>,
     obsidian: bool,
     index: &VaultIndex,
 ) -> Result<(), String> {
-    let css_name = site_css.unwrap_or("github");
-    let css_file = settings
-        .styles
-        .get(css_name)
-        .cloned()
-        .unwrap_or_else(|| format!("{css_name}.css"));
+    let css_name = "auto";
+    let css_file = "auto.css".to_string();
 
     let mut files = Vec::new();
     collect_files(root, root, &mut files)?;
@@ -266,18 +255,9 @@ fn write_css_bundle(css_dir: &Path) -> Result<(), String> {
     std::fs::write(css_dir.join("base.css"), include_str!("../css/base.css"))
         .map_err(|e| format!("cannot write base.css: {e}"))?;
 
-    for theme in crate::themes::THEMES {
-        let css = crate::themes::render_theme_css(theme);
-        std::fs::write(css_dir.join(format!("{}.css", theme.name)), css)
-            .map_err(|e| format!("cannot write {}.css: {e}", theme.name))?;
-    }
+    let auto = crate::themes::render_auto_theme_css();
+    std::fs::write(css_dir.join("auto.css"), auto)
+        .map_err(|e| format!("cannot write auto.css: {e}"))?;
 
-    for file in ["github.css", "dark.css", "simple.css"] {
-        let bundled = crate::template::bundled_css(file);
-        if !bundled.is_empty() {
-            std::fs::write(css_dir.join(file), bundled)
-                .map_err(|e| format!("cannot write {file}: {e}"))?;
-        }
-    }
     Ok(())
 }

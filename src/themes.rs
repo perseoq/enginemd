@@ -42,9 +42,9 @@ pub struct Theme {
     pub font_mono: &'static str,
 }
 
-pub fn render_theme_css(theme: &Theme) -> String {
+pub fn theme_vars(theme: &Theme) -> String {
     format!(
-        r#":root {{
+        r#"
   --body-bg: {bg};
   --body-text: {tx};
   --topbar-bg: {tbg};
@@ -83,7 +83,7 @@ pub fn render_theme_css(theme: &Theme) -> String {
   --empty-text: {emt};
   --font-family: {ffa};
   --font-mono: {fmo};
-}}"#,
+"#,
         bg = theme.body_bg,
         tx = theme.body_text,
         tbg = theme.topbar_bg,
@@ -125,7 +125,42 @@ pub fn render_theme_css(theme: &Theme) -> String {
     )
 }
 
+pub fn render_theme_css(theme: &Theme) -> String {
+    format!(":root {{{}}}\n", theme_vars(theme))
+}
+
+/// Theme that follows the OS color scheme: VS Code Light+ in light mode and
+/// Dracula (VSCode) in dark mode.
+pub fn render_auto_theme_css() -> String {
+    let light = find_theme("vs-light").expect("vs-light theme");
+    let dark = find_theme("dracula").expect("dracula theme");
+    format!(
+        ":root {{{}}}\n@media (prefers-color-scheme: dark) {{\n  :root {{{}}}\n}}\n",
+        theme_vars(light),
+        theme_vars(dark)
+    )
+}
+
 pub static THEMES: &[Theme] = &[
+    // ============= AUTO (system) =============
+    Theme {
+        name: "vs-light", label: "Visual Studio Light",
+        body_bg: "#ffffff", body_text: "#000000",
+        topbar_bg: "#f3f3f3", topbar_border: "#e5e5e5", topbar_home: "#006ab1",
+        topbar_label: "#616161", topbar_title: "#000000", topbar_desc: "#717171",
+        heading_border: "#e5e5e5", link: "#006ab1",
+        blockquote_border: "#d4d4d4", blockquote_text: "#616161", blockquote_bg: "#f3f3f3",
+        code_bg: "#f3f3f3", pre_bg: "#f3f3f3", pre_border: "#e5e5e5",
+        th_bg: "#f3f3f3", table_border: "#d4d4d4",
+        card_border: "#d4d4d4", card_hover_border: "#006ab1", card_hover_shadow: "0 1px 3px rgba(0,106,177,0.15)",
+        site_name: "#006ab1", site_desc: "#616161", site_path: "#8a8a8a", site_date: "#8a8a8a",
+        pagination_border: "#d4d4d4", pagination_active_bg: "#006ab1",
+        pagination_active_text: "#ffffff", pagination_disabled: "#8a8a8a", pagination_hover_bg: "#f3f3f3",
+        error_text: "#616161", footer_text: "#8a8a8a", footer_border: "#e5e5e5",
+        listing_header_bg: "#f3f3f3", listing_header_border: "#e5e5e5", empty_text: "#616161",
+        font_family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        font_mono: "Consolas, 'Courier New', monospace",
+    },
     // ============= CLASSICS =============
     Theme {
         name: "github", label: "GitHub",
@@ -929,4 +964,24 @@ pub static THEMES: &[Theme] = &[
 
 pub fn find_theme(name: &str) -> Option<&'static Theme> {
     THEMES.iter().find(|t| t.name == name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auto_theme_switches_light_and_dark() {
+        let css = render_auto_theme_css();
+        assert!(css.contains("prefers-color-scheme: dark"));
+        assert!(css.contains("#ffffff")); // VS Code Light+ background
+        assert!(css.contains("#282a36")); // Dracula background
+        assert!(css.contains("--body-bg"));
+    }
+
+    #[test]
+    fn required_themes_exist() {
+        assert!(find_theme("vs-light").is_some());
+        assert!(find_theme("dracula").is_some());
+    }
 }

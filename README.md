@@ -9,7 +9,7 @@ y soporte de bóvedas de Obsidian.
 ## Características
 
 - Markdown (comrak) con tablas, notas al pie, tasklists y autolinks.
-- 40+ temas CSS (`github`, `dark`, `simple`, ...).
+- **Tema automático** según el sistema: claro = VS Code Light+, oscuro = Dracula.
 - Resaltado de código en servidor (syntect).
 - **Assets self-hosted**: MathJax, KaTeX, Mermaid, Chart.js, highlight, anchor y
   Font Awesome se descargan y se sirven localmente (funciona offline).
@@ -61,7 +61,6 @@ enginemd --path /ruta               # sirve un solo directorio
 enginemd --port 8080                # puerto personalizado
 enginemd --lang es                  # idioma
 enginemd --js-support mathjax,mermaid,chartjs  # allowlist de librerías
-enginemd --css-support dark         # tema CSS o ruta a un CSS propio
 ```
 
 ## Documentación

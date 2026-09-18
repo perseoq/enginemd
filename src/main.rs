@@ -31,22 +31,14 @@ async fn main() {
     }
 
     match &cli.command {
-        Some(Commands::New {
-            name,
-            css,
-            js_support,
-        }) => {
-            if let Err(e) = project::cmd_new(name, css.as_deref(), js_support.as_deref()) {
+        Some(Commands::New { name, js_support }) => {
+            if let Err(e) = project::cmd_new(name, js_support.as_deref()) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
         }
-        Some(Commands::Up {
-            path,
-            css,
-            js_support,
-        }) => {
-            if let Err(e) = project::cmd_up(path, css.as_deref(), js_support.as_deref()) {
+        Some(Commands::Up { path, js_support }) => {
+            if let Err(e) = project::cmd_up(path, js_support.as_deref()) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
@@ -91,7 +83,6 @@ async fn main() {
                 cli.port,
                 cli.lang.clone(),
                 js_override,
-                cli.css_support.clone(),
             )
             .await
             {

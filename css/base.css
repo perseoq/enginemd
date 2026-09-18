@@ -111,3 +111,24 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 /* Copy code button */
 .markdown-body pre .copy-btn { position: absolute; top: 0.4rem; right: 0.4rem; font-size: 0.7rem; padding: 0.15rem 0.5rem; border: 1px solid var(--table-border); border-radius: 4px; background: var(--body-bg); color: var(--body-text); cursor: pointer; opacity: 0.7; }
 .markdown-body pre .copy-btn:hover { opacity: 1; }
+
+/* Dark mode (Dracula) overrides: follows the OS color scheme */
+@media (prefers-color-scheme: dark) {
+  .markdown-body pre code .comment { color: #6272a4; }
+  .markdown-body pre code .keyword { color: #ff79c6; }
+  .markdown-body pre code .storage { color: #ff79c6; }
+  .markdown-body pre code .string { color: #f1fa8c; }
+  .markdown-body pre code .constant { color: #bd93f9; }
+  .markdown-body pre code .entity { color: #50fa7b; }
+  .markdown-body pre code .support { color: #8be9fd; }
+  .markdown-body pre code .variable { color: #ffb86c; }
+  .markdown-body pre code .meta { color: #6272a4; }
+  .markdown-body pre code .invalid { color: #ff5555; background: rgba(255,85,85,0.12); }
+  .markdown-body pre code .markup { color: #50fa7b; }
+
+  .markdown-body .callout-note, .markdown-body .callout-info { border-left-color: #8be9fd; background: rgba(139,233,253,0.08); }
+  .markdown-body .callout-warning { border-left-color: #f1fa8c; background: rgba(241,250,140,0.08); }
+  .markdown-body .callout-tip, .markdown-body .callout-hint { border-left-color: #50fa7b; background: rgba(80,250,123,0.08); }
+  .markdown-body .callout-danger, .markdown-body .callout-error { border-left-color: #ff5555; background: rgba(255,85,85,0.08); }
+  .markdown-body .callout-important { border-left-color: #bd93f9; background: rgba(189,147,249,0.08); }
+}

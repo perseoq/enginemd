@@ -186,6 +186,7 @@ pub struct ScriptAsset {
 pub struct CssAsset {
     pub href: String,
     pub integrity: Option<String>,
+    pub media: Option<String>,
 }
 
 pub fn version_token(hash: &str) -> String {
@@ -355,20 +356,33 @@ impl AssetManager {
         let mut css = Vec::new();
         let mut inline = Vec::new();
 
-        let hl_css = if css_theme.contains("dark") {
-            "highlight-github-dark.css"
-        } else {
-            "highlight-github.css"
-        };
-
         for key in needed {
             let spec = match find(key) {
                 Some(s) => s,
                 None => continue,
             };
             for file in spec.files {
-                if spec.key == "highlight" && file.kind == FileKind::Css && file.local != hl_css {
-                    continue;
+                let mut media: Option<String> = None;
+                if spec.key == "highlight" && file.kind == FileKind::Css {
+                    if css_theme == "auto" {
+                        media = Some(
+                            match file.local {
+                                "highlight-github.css" => "(prefers-color-scheme: light)",
+                                "highlight-github-dark.css" => "(prefers-color-scheme: dark)",
+                                _ => continue,
+                            }
+                            .to_string(),
+                        );
+                    } else {
+                        let wanted = if css_theme.contains("dark") {
+                            "highlight-github-dark.css"
+                        } else {
+                            "highlight-github.css"
+                        };
+                        if file.local != wanted {
+                            continue;
+                        }
+                    }
                 }
                 let integrity = self.integrity(file.kind, file.local);
                 if sri && integrity.is_none() {
@@ -391,6 +405,7 @@ impl AssetManager {
                     FileKind::Css => css.push(CssAsset {
                         href: format!("{prefix}css/{}?v={}", file.local, version),
                         integrity: integrity_attr,
+                        media,
                     }),
                 }
             }

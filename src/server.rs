@@ -31,7 +31,6 @@ pub struct AppState {
     pub override_path: Option<String>,
     pub override_lang: Option<String>,
     pub override_js: Option<Vec<String>>,
-    pub override_css: Option<String>,
     pub vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
     pub obsidian_detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
     pub assets: Arc<AssetManager>,
@@ -45,7 +44,6 @@ pub async fn start_server(
     override_port: Option<u16>,
     override_lang: Option<String>,
     override_js: Option<Vec<String>>,
-    override_css: Option<String>,
 ) -> Result<(), String> {
     let (reload_tx, _) = broadcast::channel::<String>(100);
     let templates = Arc::new(TemplateEngine::new(watch_mode));
@@ -58,7 +56,6 @@ pub async fn start_server(
         override_path,
         override_lang,
         override_js,
-        override_css,
         vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
         obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
         assets: Arc::new(AssetManager::new(
@@ -299,12 +296,7 @@ async fn listing_handler(state: &AppState, page_param: Option<&String>) -> Respo
         });
     }
 
-    let css_file = state
-        .settings
-        .styles
-        .get(&state.settings.listing_css)
-        .cloned()
-        .unwrap_or_else(|| format!("{}.css", state.settings.listing_css));
+    let css_file = "auto.css".to_string();
 
     let html = state.templates.render_listing(
         &state.settings.lang,
@@ -357,7 +349,7 @@ async fn serve_single_site(
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "Site".to_string());
     let config = PageConfig {
-        css: state.override_css.as_deref().unwrap_or("github"),
+        css: "auto",
         js_support: state.override_js.as_ref(),
         lang: state
             .override_lang
@@ -391,17 +383,11 @@ async fn catch_all_handler(
     match dir_entry {
         Some(entry) => serve_path_with_config(&state, &entry, remainder).await,
         None => {
-            let css_file = state
-                .settings
-                .styles
-                .get(&state.settings.listing_css)
-                .cloned()
-                .unwrap_or_else(|| format!("{}.css", state.settings.listing_css));
             let html = state.templates.render_error(
                 404,
                 &format!("Site '{}' not found or inactive.", site_name),
                 &state.settings.lang,
-                &css_file,
+                "auto.css",
             );
             (StatusCode::NOT_FOUND, Html(html)).into_response()
         }
@@ -410,12 +396,11 @@ async fn catch_all_handler(
 
 async fn serve_path_with_config(state: &AppState, entry: &DirectoryEntry, path: &str) -> Response {
     let site_path = &entry.path;
-    let css = entry.css.as_deref().unwrap_or("github");
     let js_support = state.override_js.as_ref().or(entry.js_support.as_ref());
     let lang = entry.lang.as_deref().unwrap_or(&state.settings.lang);
 
     let config = PageConfig {
-        css,
+        css: "auto",
         js_support,
         lang,
         site_title: &entry.name,
@@ -754,12 +739,6 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
         }
     }
 
-    let hl_css = if config.css.contains("dark") {
-        "highlight-github-dark.css"
-    } else {
-        "highlight-github.css"
-    };
-
     for key in needed {
         let spec = match assets::find(key) {
             Some(s) => s,
@@ -767,9 +746,28 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
         };
 
         for file in spec.files {
-            // Only load the highlight CSS matching the active theme.
-            if spec.key == "highlight" && file.kind == FileKind::Css && file.local != hl_css {
-                continue;
+            // Highlight CSS: pick per theme, or both with media in auto mode.
+            let mut media: Option<String> = None;
+            if spec.key == "highlight" && file.kind == FileKind::Css {
+                if config.css == "auto" {
+                    media = Some(
+                        match file.local {
+                            "highlight-github.css" => "(prefers-color-scheme: light)",
+                            "highlight-github-dark.css" => "(prefers-color-scheme: dark)",
+                            _ => continue,
+                        }
+                        .to_string(),
+                    );
+                } else {
+                    let wanted = if config.css.contains("dark") {
+                        "highlight-github-dark.css"
+                    } else {
+                        "highlight-github.css"
+                    };
+                    if file.local != wanted {
+                        continue;
+                    }
+                }
             }
 
             let hash = match state.assets.ensure(file.url, file.local, file.kind).await {
@@ -796,6 +794,7 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
                 FileKind::Css => out.extra_css.push(CssAsset {
                     href: format!("{}css/{}?v={}", config.asset_prefix, file.local, version),
                     integrity,
+                    media,
                 }),
             }
         }
@@ -858,7 +857,13 @@ async fn css_handler(
         return serve_css(bundled, false);
     }
 
-    // 2. Try file from the assets dir (downloaded or user custom themes)
+    // 2. Automatic theme: follows the OS color scheme.
+    if file == "auto.css" {
+        let css = crate::themes::render_auto_theme_css();
+        return serve_css(&css, false);
+    }
+
+    // 3. Try file from the assets dir (downloaded or user custom themes)
     let css_dir = state.assets_base.join("css");
     if let Some(file_path) = safe_join(&css_dir, &file) {
         if file_path.exists() {
@@ -866,14 +871,14 @@ async fn css_handler(
         }
     }
 
-    // 3. Try generated theme from themes.rs
+    // 4. Try generated theme from themes.rs
     let theme_name = file.trim_end_matches(".css");
     if let Some(theme) = crate::themes::find_theme(theme_name) {
         let css = crate::themes::render_theme_css(theme);
         return serve_css(&css, false);
     }
 
-    // 4. Try bundled CSS (legacy)
+    // 5. Try bundled CSS (legacy)
     let bundled = crate::template::bundled_css(&file);
     if !bundled.is_empty() {
         return serve_css(bundled, false);
@@ -986,7 +991,6 @@ mod tests {
             override_path: None,
             override_lang: None,
             override_js: None,
-            override_css: None,
             vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
             obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
             assets: Arc::new(AssetManager::new(base.clone(), None, Vec::new())),
@@ -1024,6 +1028,16 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(headers.get("cache-control").is_some());
         assert!(body.contains("--body-bg"));
+    }
+
+    #[tokio::test]
+    async fn auto_css_follows_system_scheme() {
+        let (status, _headers, body) =
+            get(build_router(test_state()), "/__enginemd/css/auto.css").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("prefers-color-scheme: dark"));
+        assert!(body.contains("#282a36"));
+        assert!(body.contains("#ffffff"));
     }
 
     #[tokio::test]

@@ -192,10 +192,6 @@ mod imp {
             args.push("--js-support".to_string());
             args.push(j.clone());
         }
-        if let Some(c) = &cli.css_support {
-            args.push("--css-support".to_string());
-            args.push(c.clone());
-        }
         args
     }
 

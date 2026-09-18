@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="{{ asset_prefix }}css/base.css">
   <link rel="stylesheet" href="{{ asset_prefix }}css/{{ css_theme }}">
   {% for css in extra_css %}
-  <link rel="stylesheet" href="{{ css.href }}"{% if css.integrity %} integrity="{{ css.integrity }}"{% endif %}>
+  <link rel="stylesheet" href="{{ css.href }}"{% if css.integrity %} integrity="{{ css.integrity }}"{% endif %}{% if css.media %} media="{{ css.media }}"{% endif %}>
   {% endfor %}
   {% for raw in head_inline %}
   {{ raw | safe }}

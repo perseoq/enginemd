@@ -19,7 +19,7 @@ bóvedas de Obsidian.
 9. [Extras de render](#extras-de-render)
 10. [Modo daemon](#modo-daemon)
 11. [Export estático](#export-estático)
-12. [Temas CSS](#temas-css)
+12. [Tema automático (claro/oscuro)](#tema-automático-clarooscuro)
 13. [Configuración global](#configuración-global)
 14. [Docker y CI](#docker-y-ci)
 15. [Limitaciones](#limitaciones)
@@ -72,7 +72,6 @@ enginemd --path /ruta               # sirve un solo directorio (sin listado)
 enginemd --port 8080                # puerto personalizado
 enginemd --lang es                  # idioma
 enginemd --js-support mathjax,mermaid,chartjs  # allowlist de librerías
-enginemd --css-support dark         # tema CSS o ruta a un CSS propio
 ```
 
 Los flags son globales: también valen tras un subcomando, p. ej.
@@ -260,18 +259,19 @@ Genera HTML en `DIR/<sitio>/...`, copia los assets a `DIR/__enginemd/` y
 reescribe los enlaces `.md` a `.html`. Ideal para GitHub Pages u hosting
 estático.
 
-## Temas CSS
+## Tema automático (claro/oscuro)
 
-Hay 40+ temas. Los más usados:
+El tema se adapta al sistema, sin flags ni configuración:
 
-| Tema | Descripción |
-|------|-------------|
-| `github` (default) | Estilo GitHub |
-| `dark` | Modo oscuro |
-| `simple` | Minimalista |
+- **Sistema en modo claro** → **Visual Studio Light** (paleta de VS Code Light+).
+- **Sistema en modo oscuro** → **Dracula** (paleta de VS Code).
 
-Se configuran por sitio (`css`) o con `--css-support`. La lista completa está
-en `settings.json` (`styles`).
+Se implementa con `@media (prefers-color-scheme: dark)`: el navegador elige
+automáticamente según la preferencia del sistema operativo. También se adapta
+el resaltado de código (syntect) y los callouts.
+
+El catálogo de temas en `themes.rs` se conserva, pero la página siempre usa el
+tema automático (`auto.css`).
 
 ## Configuración global
 
@@ -282,7 +282,6 @@ en `settings.json` (`styles`).
   "port": 10300,
   "watch_port": 9696,
   "lang": "en",
-  "listing_css": "github",
   "listing_per_page": 20,
   "obsidian": false,
   "auto_fetch": true,
@@ -290,10 +289,10 @@ en `settings.json` (`styles`).
   "assets_dir": "/home/user/.enginemd",
   "cdn_base": "https://cdn.jsdelivr.net/npm",
   "cdn_fallbacks": ["https://unpkg.com"],
-  "styles": { "github": "github.css", "dark": "dark.css", "simple": "simple.css" },
+  "styles": { "auto": "auto.css", "github": "github.css", "dark": "dark.css" },
   "directories": [
     { "name": "docs", "path": "/home/user/docs", "active": true,
-      "css": "dark", "js_support": ["mathjax", "mermaid"], "obsidian": null }
+      "js_support": ["mathjax", "mermaid"], "obsidian": null }
   ]
 }
 ```

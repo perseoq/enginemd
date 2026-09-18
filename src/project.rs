@@ -1,7 +1,7 @@
 use crate::config::{self, DirectoryEntry};
 use std::path::PathBuf;
 
-pub fn cmd_new(name: &str, css: Option<&str>, js_support: Option<&str>) -> Result<(), String> {
+pub fn cmd_new(name: &str, js_support: Option<&str>) -> Result<(), String> {
     let sites_dir = config::sites_dir();
     let site_path = sites_dir.join(name);
 
@@ -36,7 +36,6 @@ pub fn cmd_new(name: &str, css: Option<&str>, js_support: Option<&str>) -> Resul
         name: name.to_string(),
         path: site_path.to_string_lossy().to_string(),
         active: true,
-        css: css.map(|s| s.to_string()),
         js_support: js_vec,
         lang: None,
         obsidian: None,
@@ -47,7 +46,7 @@ pub fn cmd_new(name: &str, css: Option<&str>, js_support: Option<&str>) -> Resul
     Ok(())
 }
 
-pub fn cmd_up(path: &str, css: Option<&str>, js_support: Option<&str>) -> Result<(), String> {
+pub fn cmd_up(path: &str, js_support: Option<&str>) -> Result<(), String> {
     let dir_path = PathBuf::from(path);
     if !dir_path.is_dir() {
         return Err(format!("Path '{}' is not a valid directory", path));
@@ -77,7 +76,6 @@ pub fn cmd_up(path: &str, css: Option<&str>, js_support: Option<&str>) -> Result
         name: name.clone(),
         path: canonical.to_string_lossy().to_string(),
         active: true,
-        css: css.map(|s| s.to_string()),
         js_support: js_vec,
         lang: None,
         obsidian: None,

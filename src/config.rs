@@ -10,8 +10,6 @@ pub struct Settings {
     pub watch_port: u16,
     #[serde(default = "default_lang")]
     pub lang: String,
-    #[serde(default = "default_listing_css")]
-    pub listing_css: String,
     #[serde(default = "default_listing_per_page")]
     pub listing_per_page: usize,
     #[serde(default)]
@@ -40,7 +38,6 @@ pub struct DirectoryEntry {
     pub path: String,
     #[serde(default = "default_active")]
     pub active: bool,
-    pub css: Option<String>,
     pub js_support: Option<Vec<String>>,
     pub lang: Option<String>,
     #[serde(default)]
@@ -55,9 +52,6 @@ fn default_watch_port() -> u16 {
 }
 fn default_lang() -> String {
     "en".to_string()
-}
-fn default_listing_css() -> String {
-    "github".to_string()
 }
 fn default_listing_per_page() -> usize {
     20
@@ -160,6 +154,7 @@ pub fn default_settings() -> Settings {
 
     let mut styles = HashMap::new();
     let theme_names = [
+        "auto",
         "github",
         "github-dark",
         "gitlab",
@@ -213,7 +208,6 @@ pub fn default_settings() -> Settings {
         port: 10300,
         watch_port: 9696,
         lang: "en".to_string(),
-        listing_css: "github".to_string(),
         listing_per_page: 20,
         dependencies,
         styles,
