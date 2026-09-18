@@ -67,6 +67,14 @@ pub fn sites_dir() -> PathBuf {
     enginemd_dir().join("sites")
 }
 
+pub fn pid_path() -> PathBuf {
+    enginemd_dir().join("enginemd.pid")
+}
+
+pub fn log_path() -> PathBuf {
+    enginemd_dir().join("enginemd.log")
+}
+
 pub fn dep_local_name(key: &str, value: &str) -> String {
     let ext = value
         .rsplit('/')

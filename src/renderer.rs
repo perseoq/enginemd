@@ -245,12 +245,19 @@ fn highlight(
         .unwrap_or_else(|| ss.find_syntax_plain_text());
 
     let mut gen = ClassedHTMLGenerator::new_with_class_style(syntax, ss, ClassStyle::Spaced);
-    for line in code.lines() {
+
+    // syntect requires each line to include its trailing newline; normalize so
+    // the last line does too, and pass chunks from split_inclusive verbatim.
+    let normalized;
+    let code = if code.ends_with('\n') {
+        code
+    } else {
+        normalized = format!("{code}\n");
+        normalized.as_str()
+    };
+
+    for line in code.split_inclusive('\n') {
         gen.parse_html_for_line_which_includes_newline(line)
-            .map_err(|_| ())?;
-    }
-    if code.ends_with('\n') {
-        gen.parse_html_for_line_which_includes_newline("")
             .map_err(|_| ())?;
     }
 
@@ -287,4 +294,43 @@ fn decode_html_entities(input: &str) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn code_blocks_preserve_newlines_and_indent() {
+        let md = "```rust\nfn main() {\n    let x = 1;\n}\n```\n";
+        let mut fm = Frontmatter::default();
+        let html = render_markdown(md, &mut fm, None);
+
+        let pre = html
+            .split_once("<pre>")
+            .and_then(|(_, rest)| rest.split_once("</pre>"))
+            .map(|(inner, _)| inner)
+            .expect("expected a <pre> block");
+
+        let text = strip_tags(pre);
+        assert!(text.contains('\n'), "code block lost its newlines: {text:?}");
+        assert!(
+            text.contains("    let x = 1;"),
+            "indentation lost: {text:?}"
+        );
+    }
+
+    fn strip_tags(input: &str) -> String {
+        let mut out = String::new();
+        let mut in_tag = false;
+        for c in input.chars() {
+            match c {
+                '<' => in_tag = true,
+                '>' => in_tag = false,
+                _ if !in_tag => out.push(c),
+                _ => {}
+            }
+        }
+        out
+    }
 }

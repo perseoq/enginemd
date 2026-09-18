@@ -34,6 +34,10 @@ enginemd --watch
 | `enginemd fetch` | Descarga librerías JS/CSS desde CDN |
 | `enginemd` | Inicia servidor en `0.0.0.0:10300` |
 | `enginemd --watch` | Inicia servidor dev en `0.0.0.0:9696` con hot-reload |
+| `enginemd daemon start` | Inicia el servidor en segundo plano (persiste al reiniciar) |
+| `enginemd daemon stop` | Detiene el daemon y desactiva el autoarranque |
+| `enginemd daemon restart` | Reinicia el daemon |
+| `enginemd daemon status` | Muestra el estado del daemon |
 
 ## Flags del servidor
 
@@ -45,6 +49,22 @@ enginemd --css-support dark         # Tema CSS
 enginemd --lang es                  # Idioma
 enginemd --obsidian                 # Modo Obsidian (wikilinks/embeds)
 ```
+
+## Modo daemon
+
+Ejecuta el servidor en segundo plano y lo deja corriendo tras reiniciar la
+máquina, sin configurar un servicio:
+
+```bash
+enginemd daemon start     # arranca en segundo plano + autoarranque @reboot
+enginemd daemon status    # estado y autoarranque
+enginemd daemon stop      # detiene y desactiva el autoarranque
+enginemd daemon restart
+```
+
+Los flags globales (`--port`, `--path`, `--lang`, `--obsidian`, ...) se reenvían
+al daemon. PID y log en `~/.enginemd/enginemd.pid` y `~/.enginemd/enginemd.log`.
+Ver `MANUAL_DAEMON.md`.
 
 ## Páginas
 
