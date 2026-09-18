@@ -21,6 +21,7 @@ impl TemplateEngine {
         Self { tera }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_listing(
         &self,
         lang: &str,
@@ -42,11 +43,12 @@ impl TemplateEngine {
         ctx.insert("page_start", &page_start);
         ctx.insert("page_end", &page_end);
 
-        self.tera.render("listing", &ctx).unwrap_or_else(|e| {
-            format!("<h1>Template error</h1><p>{e}</p>")
-        })
+        self.tera
+            .render("listing", &ctx)
+            .unwrap_or_else(|e| format!("<h1>Template error</h1><p>{e}</p>"))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_page(
         &self,
         title: Option<&str>,
@@ -56,6 +58,9 @@ impl TemplateEngine {
         lang: &str,
         css_theme: &str,
         base_url: Option<&str>,
+        body_class: &str,
+        tags: &[String],
+        asset_prefix: &str,
         extra_css: &[crate::assets::CssAsset],
         head_scripts: &[crate::assets::ScriptAsset],
         head_inline: &[String],
@@ -70,24 +75,21 @@ impl TemplateEngine {
         ctx.insert("lang", lang);
         ctx.insert("css_theme", css_theme);
         ctx.insert("base_url", &base_url);
+        ctx.insert("body_class", &body_class);
+        ctx.insert("tags", &tags);
+        ctx.insert("asset_prefix", &asset_prefix);
         ctx.insert("extra_css", extra_css);
         ctx.insert("head_scripts", head_scripts);
         ctx.insert("head_inline", head_inline);
         ctx.insert("body_scripts", body_scripts);
         ctx.insert("watch_mode", &watch_mode);
 
-        self.tera.render("page", &ctx).unwrap_or_else(|e| {
-            format!("<h1>Template error</h1><p>{e}</p>")
-        })
+        self.tera
+            .render("page", &ctx)
+            .unwrap_or_else(|e| format!("<h1>Template error</h1><p>{e}</p>"))
     }
 
-    pub fn render_error(
-        &self,
-        status: u16,
-        message: &str,
-        lang: &str,
-        css_theme: &str,
-    ) -> String {
+    pub fn render_error(&self, status: u16, message: &str, lang: &str, css_theme: &str) -> String {
         let mut ctx = Context::new();
         ctx.insert("status", &status);
         ctx.insert("message", message);
@@ -116,7 +118,12 @@ fn range_filter(
     let start = args.get("start").and_then(|v| v.as_i64()).unwrap_or(1);
     let end = args.get("end").and_then(|v| v.as_i64()).unwrap_or(0);
     let values: Vec<i64> = (start..end).collect();
-    Ok(tera::Value::Array(values.into_iter().map(|v| tera::Value::Number(v.into())).collect()))
+    Ok(tera::Value::Array(
+        values
+            .into_iter()
+            .map(|v| tera::Value::Number(v.into()))
+            .collect(),
+    ))
 }
 
 pub fn bundled_css(name: &str) -> &'static str {

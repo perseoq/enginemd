@@ -9,7 +9,11 @@ pub struct Cli {
     #[arg(long, help = "Enable hot-reload mode (default port: 9696)")]
     pub watch: bool,
 
-    #[arg(long, global = true, help = "Serve a single directory directly (no listing)")]
+    #[arg(
+        long,
+        global = true,
+        help = "Serve a single directory directly (no listing)"
+    )]
     pub path: Option<String>,
 
     #[arg(long, global = true, help = "Override server port")]
@@ -18,7 +22,11 @@ pub struct Cli {
     #[arg(long, global = true, help = "Override language")]
     pub lang: Option<String>,
 
-    #[arg(long, global = true, help = "Comma-separated JS libs: mathjax,mermaid,chartjs,...")]
+    #[arg(
+        long,
+        global = true,
+        help = "Comma-separated JS libs: mathjax,mermaid,chartjs,..."
+    )]
     pub js_support: Option<String>,
 
     #[arg(long, global = true, help = "CSS theme or path to custom CSS")]
@@ -44,13 +52,16 @@ pub enum Commands {
         js_support: Option<String>,
     },
     #[command(about = "Remove/unregister a site")]
-    Down {
-        name: String,
-    },
+    Down { name: String },
     #[command(about = "Download JS/CSS dependencies")]
     Fetch {
         #[arg(long, help = "Re-download assets even if already cached")]
         force: bool,
+    },
+    #[command(about = "Export sites to static HTML")]
+    Build {
+        #[arg(long, help = "Output directory")]
+        out: String,
     },
     #[command(about = "Manage the background daemon")]
     Daemon {
@@ -69,4 +80,6 @@ pub enum DaemonAction {
     Restart,
     #[command(about = "Show daemon status")]
     Status,
+    #[command(about = "Show the daemon log")]
+    Logs,
 }

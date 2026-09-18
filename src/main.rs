@@ -1,4 +1,5 @@
 mod assets;
+mod build;
 mod cli;
 mod config;
 mod daemon;
@@ -30,13 +31,21 @@ async fn main() {
     }
 
     match &cli.command {
-        Some(Commands::New { name, css, js_support }) => {
+        Some(Commands::New {
+            name,
+            css,
+            js_support,
+        }) => {
             if let Err(e) = project::cmd_new(name, css.as_deref(), js_support.as_deref()) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
         }
-        Some(Commands::Up { path, css, js_support }) => {
+        Some(Commands::Up {
+            path,
+            css,
+            js_support,
+        }) => {
             if let Err(e) = project::cmd_up(path, css.as_deref(), js_support.as_deref()) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
@@ -50,6 +59,12 @@ async fn main() {
         }
         Some(Commands::Fetch { force }) => {
             if let Err(e) = registry::cmd_fetch(*force).await {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::Build { out }) => {
+            if let Err(e) = build::cmd_build(out, cli.path.as_deref()).await {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }

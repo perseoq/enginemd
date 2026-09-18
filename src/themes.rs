@@ -43,7 +43,8 @@ pub struct Theme {
 }
 
 pub fn render_theme_css(theme: &Theme) -> String {
-    format!(r#":root {{
+    format!(
+        r#":root {{
   --body-bg: {bg};
   --body-text: {tx};
   --topbar-bg: {tbg};
@@ -83,21 +84,44 @@ pub fn render_theme_css(theme: &Theme) -> String {
   --font-family: {ffa};
   --font-mono: {fmo};
 }}"#,
-        bg = theme.body_bg, tx = theme.body_text,
-        tbg = theme.topbar_bg, tbd = theme.topbar_border, thm = theme.topbar_home,
-        tlb = theme.topbar_label, ttl = theme.topbar_title, tds = theme.topbar_desc,
-        hbd = theme.heading_border, lnk = theme.link,
-        qbd = theme.blockquote_border, qtx = theme.blockquote_text, qbg = theme.blockquote_bg,
-        cbg = theme.code_bg, pbg = theme.pre_bg, pbd = theme.pre_border,
-        thg = theme.th_bg, tbl = theme.table_border,
-        cbd = theme.card_border, chb = theme.card_hover_border, chs = theme.card_hover_shadow,
-        snm = theme.site_name, sds = theme.site_desc, spt = theme.site_path, sdt = theme.site_date,
-        pgn = theme.pagination_border, pab = theme.pagination_active_bg,
-        pat = theme.pagination_active_text, pds = theme.pagination_disabled, phb = theme.pagination_hover_bg,
-        err = theme.error_text, ftt = theme.footer_text, fbd = theme.footer_border,
-        lhb = theme.listing_header_bg, lhd = theme.listing_header_border,
+        bg = theme.body_bg,
+        tx = theme.body_text,
+        tbg = theme.topbar_bg,
+        tbd = theme.topbar_border,
+        thm = theme.topbar_home,
+        tlb = theme.topbar_label,
+        ttl = theme.topbar_title,
+        tds = theme.topbar_desc,
+        hbd = theme.heading_border,
+        lnk = theme.link,
+        qbd = theme.blockquote_border,
+        qtx = theme.blockquote_text,
+        qbg = theme.blockquote_bg,
+        cbg = theme.code_bg,
+        pbg = theme.pre_bg,
+        pbd = theme.pre_border,
+        thg = theme.th_bg,
+        tbl = theme.table_border,
+        cbd = theme.card_border,
+        chb = theme.card_hover_border,
+        chs = theme.card_hover_shadow,
+        snm = theme.site_name,
+        sds = theme.site_desc,
+        spt = theme.site_path,
+        sdt = theme.site_date,
+        pgn = theme.pagination_border,
+        pab = theme.pagination_active_bg,
+        pat = theme.pagination_active_text,
+        pds = theme.pagination_disabled,
+        phb = theme.pagination_hover_bg,
+        err = theme.error_text,
+        ftt = theme.footer_text,
+        fbd = theme.footer_border,
+        lhb = theme.listing_header_bg,
+        lhd = theme.listing_header_border,
         emt = theme.empty_text,
-        ffa = theme.font_family, fmo = theme.font_mono,
+        ffa = theme.font_family,
+        fmo = theme.font_mono,
     )
 }
 

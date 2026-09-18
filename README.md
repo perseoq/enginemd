@@ -32,12 +32,14 @@ enginemd --watch
 | `enginemd up <path>` | Registra un directorio existente como sitio |
 | `enginemd down <name>` | Elimina un sitio del listado |
 | `enginemd fetch [--force]` | Descarga las librerías JS/CSS al caché local |
+| `enginemd build --out DIR` | Exporta los sitios a HTML estático |
 | `enginemd` | Inicia servidor en `0.0.0.0:10300` |
 | `enginemd --watch` | Inicia servidor dev en `0.0.0.0:9696` con hot-reload |
 | `enginemd daemon start` | Inicia el servidor en segundo plano (persiste al reiniciar) |
 | `enginemd daemon stop` | Detiene el daemon y desactiva el autoarranque |
 | `enginemd daemon restart` | Reinicia el daemon |
 | `enginemd daemon status` | Muestra el estado del daemon |
+| `enginemd daemon logs` | Muestra el log del daemon |
 
 ## Flags del servidor
 
@@ -137,6 +139,27 @@ nombre en todo el sitio, como en Obsidian.
 Se activa automáticamente, sin configuración: si el sitio tiene una carpeta
 `.obsidian/` o si su contenido usa sintaxis Obsidian (`[[...]]` o `![[...]]`).
 Ver `MANUAL_OBSIDIAN.md`.
+
+## Export estático
+
+```bash
+enginemd build --out ./public          # todos los sitios registrados
+enginemd --path /ruta build --out ./public   # un solo directorio
+```
+
+Genera HTML en `DIR/<sitio>/...`, copia los assets a `DIR/__enginemd/` y
+reescribe los enlaces `.md` a `.html`. Ideal para GitHub Pages u hosting
+estático.
+
+## Extras de render
+
+- **Callouts de Obsidian**: `> [!note]`, `> [!warning]`, `> [!tip]`, etc.
+- **Frontmatter**: `tags`, `aliases`, `cssclasses`, `draft` (string o lista).
+- **TOC** plegable y **botón de copiar** en bloques de código (cliente).
+- **Compresión gzip** de las respuestas.
+- **Healthcheck**: `GET /__enginemd/health`.
+- **Docker**: `docker build -t enginemd .`
+- **CI**: GitHub Actions (fmt, clippy, test, build).
 
 ## Temas CSS
 

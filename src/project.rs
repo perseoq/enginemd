@@ -1,12 +1,16 @@
-use std::path::PathBuf;
 use crate::config::{self, DirectoryEntry};
+use std::path::PathBuf;
 
 pub fn cmd_new(name: &str, css: Option<&str>, js_support: Option<&str>) -> Result<(), String> {
     let sites_dir = config::sites_dir();
     let site_path = sites_dir.join(name);
 
     if site_path.exists() {
-        return Err(format!("Site '{}' already exists at {}", name, site_path.display()));
+        return Err(format!(
+            "Site '{}' already exists at {}",
+            name,
+            site_path.display()
+        ));
     }
 
     std::fs::create_dir_all(&site_path)
@@ -49,8 +53,8 @@ pub fn cmd_up(path: &str, css: Option<&str>, js_support: Option<&str>) -> Result
         return Err(format!("Path '{}' is not a valid directory", path));
     }
 
-    let canonical = std::fs::canonicalize(&dir_path)
-        .map_err(|e| format!("cannot resolve path: {e}"))?;
+    let canonical =
+        std::fs::canonicalize(&dir_path).map_err(|e| format!("cannot resolve path: {e}"))?;
     let name = dir_path
         .file_name()
         .map(|s| s.to_string_lossy().to_string())

@@ -17,14 +17,68 @@ pub struct Frontmatter {
     pub description: Option<String>,
     #[serde(default)]
     pub lang: Option<String>,
+    #[serde(default, deserialize_with = "string_or_seq")]
+    pub tags: Vec<String>,
+    #[serde(default, deserialize_with = "string_or_seq")]
+    pub aliases: Vec<String>,
+    #[serde(default, deserialize_with = "string_or_seq")]
+    pub cssclasses: Vec<String>,
+    #[serde(default)]
+    pub draft: bool,
+}
+
+/// Accepts either a YAML sequence or a single string (Obsidian allows both).
+fn string_or_seq<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+
+    let value = Option::<OneOrMany>::deserialize(deserializer)?;
+    Ok(match value {
+        Some(OneOrMany::One(s)) => s
+            .split(|c: char| c == ',' || c.is_whitespace())
+            .map(|x| x.trim_start_matches('#').to_string())
+            .filter(|x| !x.is_empty())
+            .collect(),
+        Some(OneOrMany::Many(list)) => list,
+        None => Vec::new(),
+    })
+}
+
+fn merge_frontmatter(dst: &mut Frontmatter, src: Frontmatter) {
+    if src.title.is_some() {
+        dst.title = src.title;
+    }
+    if src.description.is_some() {
+        dst.description = src.description;
+    }
+    if src.lang.is_some() {
+        dst.lang = src.lang;
+    }
+    if !src.tags.is_empty() {
+        dst.tags = src.tags;
+    }
+    if !src.aliases.is_empty() {
+        dst.aliases = src.aliases;
+    }
+    if !src.cssclasses.is_empty() {
+        dst.cssclasses = src.cssclasses;
+    }
+    if src.draft {
+        dst.draft = true;
+    }
 }
 
 pub fn extract_frontmatter(input: &str, fm: &mut Frontmatter) {
     let (_body, parsed) = parse_frontmatter(input);
     if let Some(f) = parsed {
-        if f.title.is_some() { fm.title = f.title; }
-        if f.description.is_some() { fm.description = f.description; }
-        if f.lang.is_some() { fm.lang = f.lang; }
+        merge_frontmatter(fm, f);
     }
 }
 
@@ -43,9 +97,7 @@ pub fn render_markdown(
 ) -> String {
     let (body, fm) = parse_frontmatter(input);
     if let Some(f) = fm {
-        if f.title.is_some() { frontmatter.title = f.title; }
-        if f.description.is_some() { frontmatter.description = f.description; }
-        if f.lang.is_some() { frontmatter.lang = f.lang; }
+        merge_frontmatter(frontmatter, f);
     }
 
     let html = match ctx {
@@ -62,7 +114,7 @@ pub fn render_markdown(
             }
             render_body(body, &embed_ctx, 0, &mut visited)
         }
-        _ => markdown_to_html(body, &comrak_options(false)),
+        _ => apply_callouts(&markdown_to_html(body, &comrak_options(false))),
     };
 
     highlight_code_blocks(&html)
@@ -75,9 +127,25 @@ pub fn render_body(
     visited: &mut HashSet<String>,
 ) -> String {
     let html = markdown_to_html(markdown, &comrak_options(true));
+    let html = apply_callouts(&html);
     let html = obsidian::apply_block_ids(&html);
     let html = obsidian::resolve_embeds(&html, ctx, depth, visited);
     obsidian::resolve_obsidian(&html, ctx, depth, visited)
+}
+
+fn apply_callouts(html: &str) -> String {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(r#"<blockquote>\s*<p>\[!([A-Za-z]+)\][+-]?\s*([^\n<]*)"#).unwrap()
+    });
+    re.replace_all(html, |caps: &regex::Captures| {
+        format!(
+            r#"<blockquote class="callout callout-{}"><p class="callout-title">{}</p><p class="callout-body">"#,
+            caps[1].to_lowercase(),
+            caps[2].trim_end()
+        )
+    })
+    .into_owned()
 }
 
 pub fn body_without_frontmatter(input: &str) -> &str {
@@ -85,22 +153,28 @@ pub fn body_without_frontmatter(input: &str) -> &str {
 }
 
 fn comrak_options(obsidian: bool) -> ComrakOptions<'static> {
-    let mut ext = comrak::ExtensionOptions::default();
-    ext.strikethrough = true;
-    ext.table = true;
-    ext.autolink = true;
-    ext.tasklist = true;
-    ext.header_ids = Some("".to_string());
-    ext.footnotes = true;
-    ext.wikilinks_title_after_pipe = obsidian;
+    let ext = comrak::ExtensionOptions {
+        strikethrough: true,
+        table: true,
+        autolink: true,
+        tasklist: true,
+        header_ids: Some(String::new()),
+        footnotes: true,
+        wikilinks_title_after_pipe: obsidian,
+        ..Default::default()
+    };
 
-    let mut parse = comrak::ParseOptions::default();
-    parse.smart = true;
-    parse.default_info_string = Some("".to_string());
+    let parse = comrak::ParseOptions {
+        smart: true,
+        default_info_string: Some(String::new()),
+        ..Default::default()
+    };
 
-    let mut render = comrak::RenderOptions::default();
-    render.github_pre_lang = true;
-    render.full_info_string = true;
+    let render = comrak::RenderOptions {
+        github_pre_lang: true,
+        full_info_string: true,
+        ..Default::default()
+    };
 
     ComrakOptions {
         extension: ext,
@@ -112,8 +186,8 @@ fn comrak_options(obsidian: bool) -> ComrakOptions<'static> {
 pub fn extract_first_heading(input: &str) -> Option<String> {
     let body = {
         let trimmed = input.trim();
-        if trimmed.starts_with("---") {
-            let end = trimmed[3..].find("\n---").map(|i| i + 3);
+        if let Some(rest) = trimmed.strip_prefix("---") {
+            let end = rest.find("\n---").map(|i| i + 3);
             match end {
                 Some(pos) => trimmed[pos + 4..].trim(),
                 None => trimmed,
@@ -124,9 +198,8 @@ pub fn extract_first_heading(input: &str) -> Option<String> {
     };
 
     for line in body.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("# ") {
-            return Some(trimmed[2..].trim().to_string());
+        if let Some(rest) = line.trim().strip_prefix("# ") {
+            return Some(rest.trim().to_string());
         }
     }
     None
@@ -152,13 +225,31 @@ fn parse_frontmatter(input: &str) -> (&str, Option<Frontmatter>) {
     }
 }
 
+fn syntax_set() -> &'static SyntaxSet {
+    static SS: std::sync::OnceLock<SyntaxSet> = std::sync::OnceLock::new();
+    SS.get_or_init(SyntaxSet::load_defaults_newlines)
+}
+
+fn theme_set() -> &'static ThemeSet {
+    static TS: std::sync::OnceLock<ThemeSet> = std::sync::OnceLock::new();
+    TS.get_or_init(ThemeSet::load_defaults)
+}
+
+fn code_block_re() -> &'static Regex {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(
+            r#"<pre(?: lang="([^"]*)")?><code(?: class="language-([^"]*)")?>([\s\S]*?)</code></pre>"#,
+        )
+        .unwrap()
+    })
+}
+
 fn highlight_code_blocks(html: &str) -> String {
-    let ss = SyntaxSet::load_defaults_newlines();
-    let ts = ThemeSet::load_defaults();
+    let ss = syntax_set();
+    let ts = theme_set();
     let theme = &ts.themes["base16-ocean.light"];
-    let re = Regex::new(
-        r#"<pre(?: lang="([^"]*)")?><code(?: class="language-([^"]*)")?>([\s\S]*?)</code></pre>"#
-    ).unwrap();
+    let re = code_block_re();
 
     let mut result = String::with_capacity(html.len() + 4096);
     let mut last_end = 0;
@@ -168,13 +259,27 @@ fn highlight_code_blocks(html: &str) -> String {
         let m = cap.get(0).unwrap();
         result.push_str(&html[last_end..m.start()]);
 
-        let lang = cap.get(1).and_then(|m| {
-            let s = m.as_str();
-            if s.is_empty() { None } else { Some(s) }
-        }).or_else(|| cap.get(2).and_then(|m| {
-            let s = m.as_str();
-            if s.is_empty() { None } else { Some(s) }
-        })).unwrap_or("");
+        let lang = cap
+            .get(1)
+            .and_then(|m| {
+                let s = m.as_str();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s)
+                }
+            })
+            .or_else(|| {
+                cap.get(2).and_then(|m| {
+                    let s = m.as_str();
+                    if s.is_empty() {
+                        None
+                    } else {
+                        Some(s)
+                    }
+                })
+            })
+            .unwrap_or("");
         let code = cap.get(3).unwrap().as_str();
         let decoded = decode_html_entities(code);
 
@@ -185,7 +290,7 @@ fn highlight_code_blocks(html: &str) -> String {
                 result.push_str(m.as_str());
             }
         } else {
-            match highlight(&decoded, lang, &ss, theme) {
+            match highlight(&decoded, lang, ss, theme) {
                 Ok(highlighted) => {
                     result.push_str("<pre><code class=\"language-");
                     result.push_str(lang);
@@ -272,7 +377,9 @@ fn decode_html_entities(input: &str) -> String {
         if c == '&' {
             let mut entity = String::new();
             for ch in chars.by_ref() {
-                if ch == ';' { break; }
+                if ch == ';' {
+                    break;
+                }
                 entity.push(ch);
             }
             let decoded = match entity.as_str() {
@@ -313,7 +420,10 @@ mod tests {
             .expect("expected a <pre> block");
 
         let text = strip_tags(pre);
-        assert!(text.contains('\n'), "code block lost its newlines: {text:?}");
+        assert!(
+            text.contains('\n'),
+            "code block lost its newlines: {text:?}"
+        );
         assert!(
             text.contains("    let x = 1;"),
             "indentation lost: {text:?}"
@@ -332,5 +442,29 @@ mod tests {
             }
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod fm_tests {
+    use super::*;
+
+    #[test]
+    fn frontmatter_tags_and_classes() {
+        let input = "---\ntitle: T\ntags: [a, b]\ncssclasses: c\n---\n\n# H\n";
+        let mut fm = Frontmatter::default();
+        let _ = render_markdown(input, &mut fm, None);
+        assert_eq!(fm.title.as_deref(), Some("T"));
+        assert_eq!(fm.tags, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(fm.cssclasses, vec!["c".to_string()]);
+    }
+
+    #[test]
+    fn frontmatter_string_lists() {
+        let input = "---\ntags: rust, docs\ncssclasses: wide\n---\n\n# H\n";
+        let mut fm = Frontmatter::default();
+        let _ = render_markdown(input, &mut fm, None);
+        assert_eq!(fm.tags, vec!["rust".to_string(), "docs".to_string()]);
+        assert_eq!(fm.cssclasses, vec!["wide".to_string()]);
     }
 }

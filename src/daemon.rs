@@ -54,7 +54,21 @@ mod imp {
                 start(cli)
             }
             DaemonAction::Status => status(),
+            DaemonAction::Logs => logs(),
         }
+    }
+
+    fn logs() -> Result<(), String> {
+        let path = crate::config::log_path();
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+        println!("# {}", path.display());
+        let lines: Vec<&str> = content.lines().collect();
+        let start = lines.len().saturating_sub(80);
+        for line in &lines[start..] {
+            println!("{line}");
+        }
+        Ok(())
     }
 
     fn start(cli: &Cli) -> Result<(), String> {
@@ -70,8 +84,7 @@ mod imp {
             let _ = std::fs::remove_file(crate::config::pid_path());
         }
 
-        let exe = std::env::current_exe()
-            .map_err(|e| format!("cannot resolve executable: {e}"))?;
+        let exe = std::env::current_exe().map_err(|e| format!("cannot resolve executable: {e}"))?;
 
         let log = std::fs::OpenOptions::new()
             .create(true)
@@ -265,8 +278,7 @@ mod imp {
     }
 
     fn install_autostart() -> Result<bool, String> {
-        let exe = std::env::current_exe()
-            .map_err(|e| format!("cannot resolve executable: {e}"))?;
+        let exe = std::env::current_exe().map_err(|e| format!("cannot resolve executable: {e}"))?;
         let exe = exe.to_string_lossy().to_string();
 
         let current = read_crontab()?;
@@ -304,9 +316,7 @@ mod imp {
 
     fn read_crontab() -> Result<String, String> {
         match Command::new("crontab").arg("-l").output() {
-            Ok(o) if o.status.success() => {
-                Ok(String::from_utf8_lossy(&o.stdout).to_string())
-            }
+            Ok(o) if o.status.success() => Ok(String::from_utf8_lossy(&o.stdout).to_string()),
             Ok(o) => {
                 let err = String::from_utf8_lossy(&o.stderr);
                 if err.contains("no crontab") {

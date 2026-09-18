@@ -78,7 +78,11 @@ impl VaultIndex {
 
     fn insert(&mut self, vf: VaultFile) {
         let rel_lower = vf.rel.to_lowercase();
-        let base = rel_lower.rsplit('/').next().unwrap_or(&rel_lower).to_string();
+        let base = rel_lower
+            .rsplit('/')
+            .next()
+            .unwrap_or(&rel_lower)
+            .to_string();
         let key = match vf.kind {
             VaultKind::Note => base.trim_end_matches(".md").to_string(),
             VaultKind::Asset => base,
@@ -104,7 +108,9 @@ impl VaultIndex {
 
         let base = lower.rsplit('/').next().unwrap_or(&lower);
         let key = base.trim_end_matches(".md").to_string();
-        self.by_name.get(&key).and_then(|c| pick_shortest(c).cloned())
+        self.by_name
+            .get(&key)
+            .and_then(|c| pick_shortest(c).cloned())
     }
 }
 
@@ -482,7 +488,9 @@ fn decode_href(raw: &str) -> String {
         .replace("&quot;", "\"")
         .replace("&#x27;", "'")
         .replace("&#39;", "'");
-    percent_decode_str(&unescaped).decode_utf8_lossy().to_string()
+    percent_decode_str(&unescaped)
+        .decode_utf8_lossy()
+        .to_string()
 }
 
 fn html_escape(s: &str) -> String {
@@ -546,7 +554,11 @@ fn extract_block(body: &str, id: &str) -> String {
     let marker = format!("^{id}");
     for line in body.lines() {
         if line.trim_end().ends_with(&marker) {
-            return line.trim_end().trim_end_matches(&marker).trim_end().to_string();
+            return line
+                .trim_end()
+                .trim_end_matches(&marker)
+                .trim_end()
+                .to_string();
         }
     }
     body.to_string()
@@ -558,7 +570,10 @@ mod tests {
 
     #[test]
     fn slug_matches_comrak() {
-        assert_eq!(slugify_heading("Título de la sección"), "título-de-la-sección");
+        assert_eq!(
+            slugify_heading("Título de la sección"),
+            "título-de-la-sección"
+        );
         assert_eq!(slugify_heading("Hello, World!"), "hello-world");
         assert_eq!(slugify_heading("Foo_Bar"), "foo_bar");
     }

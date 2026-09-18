@@ -58,6 +58,30 @@ varias coincidencias, la ruta más corta.
 Las incrustaciones de notas se renderizan recursivamente con detección de
 ciclos y un límite de profundidad de 5.
 
+## Callouts
+
+```markdown
+> [!note] Título opcional
+> Contenido del callout.
+```
+
+Tipos soportados (con color propio): `note`, `info`, `tip`, `hint`, `warning`,
+`important`, `danger`, `error`.
+
+## Tags y clases CSS
+
+En el frontmatter puedes usar `tags`, `aliases` y `cssclasses`, como string o
+lista:
+
+```yaml
+---
+tags: [rust, docs]
+cssclasses: wide-page
+---
+```
+
+Los tags se muestran al pie de la página y `cssclasses` se aplica al `<body>`.
+
 ## Bloques
 
 Añade `^id` al final de un párrafo o elemento de lista para crear un ancla

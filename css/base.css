@@ -85,3 +85,29 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 .markdown-body .block-ref { display: block; height: 0; }
 
 
+
+/* Callouts (Obsidian) */
+.markdown-body blockquote.callout { border-left-width: 4px; border-radius: 0 6px 6px 0; padding: 0.6rem 1rem; }
+.markdown-body .callout-title { font-weight: 600; margin: 0 0 0.25rem; }
+.markdown-body .callout-title:empty { display: none; }
+.markdown-body .callout-body { margin: 0; }
+.markdown-body .callout-note, .markdown-body .callout-info { border-left-color: #0969da; background: rgba(9,105,218,0.06); }
+.markdown-body .callout-warning { border-left-color: #d29922; background: rgba(210,153,34,0.08); }
+.markdown-body .callout-tip, .markdown-body .callout-hint { border-left-color: #1a7f37; background: rgba(26,127,55,0.07); }
+.markdown-body .callout-danger, .markdown-body .callout-error { border-left-color: #cf222e; background: rgba(207,34,46,0.07); }
+.markdown-body .callout-important { border-left-color: #8250df; background: rgba(130,80,223,0.07); }
+
+/* Tags */
+.page-tags { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--heading-border); display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.page-tags .tag { font-size: 0.8rem; color: var(--link); background: var(--code-bg); border-radius: 999px; padding: 0.15rem 0.6rem; }
+
+/* Table of contents */
+.markdown-body .toc { margin: 0 0 1.5rem; padding: 0.5rem 1rem; border: 1px solid var(--heading-border); border-radius: 6px; }
+.markdown-body .toc summary { cursor: pointer; font-weight: 600; }
+.markdown-body .toc ul { list-style: none; margin: 0.5rem 0 0; padding-left: 0; }
+.markdown-body .toc li { margin: 0.15rem 0; }
+.markdown-body .toc .toc-h3 { padding-left: 1rem; }
+
+/* Copy code button */
+.markdown-body pre .copy-btn { position: absolute; top: 0.4rem; right: 0.4rem; font-size: 0.7rem; padding: 0.15rem 0.5rem; border: 1px solid var(--table-border); border-radius: 4px; background: var(--body-bg); color: var(--body-text); cursor: pointer; opacity: 0.7; }
+.markdown-body pre .copy-btn:hover { opacity: 1; }

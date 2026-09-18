@@ -188,6 +188,14 @@ pub struct CssAsset {
     pub integrity: Option<String>,
 }
 
+pub fn version_token(hash: &str) -> String {
+    hash.chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .skip("sha384".len())
+        .take(16)
+        .collect()
+}
+
 /// Manages the local cache of downloaded assets and their SRI hashes.
 pub struct AssetManager {
     js_dir: PathBuf,
@@ -259,12 +267,7 @@ impl AssetManager {
 
     /// Ensure the file exists locally, downloading it if needed, and return its
     /// SRI hash (`sha384-...`).
-    pub async fn ensure(
-        &self,
-        url: &str,
-        local: &str,
-        kind: FileKind,
-    ) -> Result<String, String> {
+    pub async fn ensure(&self, url: &str, local: &str, kind: FileKind) -> Result<String, String> {
         let path = self.dir_for(kind).join(local);
 
         if path.exists() {
@@ -298,12 +301,7 @@ impl AssetManager {
         }
     }
 
-    async fn wait_for(
-        &self,
-        kind: FileKind,
-        local: &str,
-        path: &Path,
-    ) -> Result<String, String> {
+    async fn wait_for(&self, kind: FileKind, local: &str, path: &Path) -> Result<String, String> {
         for _ in 0..100 {
             if path.exists() {
                 if let Some(hash) = self.integrity(kind, local) {
@@ -335,6 +333,73 @@ impl AssetManager {
                 }
             }
         }
+    }
+
+    /// Build the asset references for a set of libraries from the local cache.
+    /// Assumes the files are already downloaded.
+    #[allow(clippy::type_complexity)]
+    pub fn asset_list(
+        &self,
+        needed: &HashSet<&'static str>,
+        css_theme: &str,
+        prefix: &str,
+        sri: bool,
+    ) -> (
+        Vec<ScriptAsset>,
+        Vec<ScriptAsset>,
+        Vec<CssAsset>,
+        Vec<String>,
+    ) {
+        let mut head = Vec::new();
+        let mut body = Vec::new();
+        let mut css = Vec::new();
+        let mut inline = Vec::new();
+
+        let hl_css = if css_theme.contains("dark") {
+            "highlight-github-dark.css"
+        } else {
+            "highlight-github.css"
+        };
+
+        for key in needed {
+            let spec = match find(key) {
+                Some(s) => s,
+                None => continue,
+            };
+            for file in spec.files {
+                if spec.key == "highlight" && file.kind == FileKind::Css && file.local != hl_css {
+                    continue;
+                }
+                let integrity = self.integrity(file.kind, file.local);
+                if sri && integrity.is_none() {
+                    continue;
+                }
+                let version = integrity.as_deref().map(version_token).unwrap_or_default();
+                let integrity_attr = if sri { integrity } else { None };
+
+                match file.kind {
+                    FileKind::Js => {
+                        let script = ScriptAsset {
+                            src: format!("{prefix}js/{}?v={}", file.local, version),
+                            integrity: integrity_attr,
+                        };
+                        match spec.position {
+                            Position::Head => head.push(script),
+                            Position::Body => body.push(script),
+                        }
+                    }
+                    FileKind::Css => css.push(CssAsset {
+                        href: format!("{prefix}css/{}?v={}", file.local, version),
+                        integrity: integrity_attr,
+                    }),
+                }
+            }
+            for init in spec.init {
+                inline.push(init.to_string());
+            }
+        }
+
+        (head, body, css, inline)
     }
 }
 

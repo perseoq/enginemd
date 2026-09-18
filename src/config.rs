@@ -47,13 +47,27 @@ pub struct DirectoryEntry {
     pub obsidian: Option<bool>,
 }
 
-fn default_port() -> u16 { 10300 }
-fn default_watch_port() -> u16 { 9696 }
-fn default_lang() -> String { "en".to_string() }
-fn default_listing_css() -> String { "github".to_string() }
-fn default_listing_per_page() -> usize { 20 }
-fn default_active() -> bool { true }
-fn default_true() -> bool { true }
+fn default_port() -> u16 {
+    10300
+}
+fn default_watch_port() -> u16 {
+    9696
+}
+fn default_lang() -> String {
+    "en".to_string()
+}
+fn default_listing_css() -> String {
+    "github".to_string()
+}
+fn default_listing_per_page() -> usize {
+    20
+}
+fn default_active() -> bool {
+    true
+}
+fn default_true() -> bool {
+    true
+}
 
 pub fn enginemd_dir() -> PathBuf {
     let home = std::env::var("HOME")
@@ -107,35 +121,89 @@ pub fn save_settings(settings: &Settings) -> Result<(), String> {
     let path = settings_path();
     let dir = path.parent().unwrap();
     std::fs::create_dir_all(dir).map_err(|e| format!("cannot create config dir: {e}"))?;
-    let content = serde_json::to_string_pretty(settings)
-        .map_err(|e| format!("serialization error: {e}"))?;
+    let content =
+        serde_json::to_string_pretty(settings).map_err(|e| format!("serialization error: {e}"))?;
     std::fs::write(&path, &content).map_err(|e| format!("cannot write settings: {e}"))?;
     Ok(())
 }
 
 pub fn default_settings() -> Settings {
     let mut dependencies = HashMap::new();
-    dependencies.insert("mathjax".to_string(), "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js".to_string());
-    dependencies.insert("mermaid".to_string(), "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js".to_string());
-    dependencies.insert("chartjs".to_string(), "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js".to_string());
-    dependencies.insert("highlight".to_string(), "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js".to_string());
-    dependencies.insert("katex".to_string(), "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js".to_string());
-    dependencies.insert("fontawesome".to_string(), "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css".to_string());
-    dependencies.insert("anchor".to_string(), "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js".to_string());
+    dependencies.insert(
+        "mathjax".to_string(),
+        "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js".to_string(),
+    );
+    dependencies.insert(
+        "mermaid".to_string(),
+        "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js".to_string(),
+    );
+    dependencies.insert(
+        "chartjs".to_string(),
+        "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js".to_string(),
+    );
+    dependencies.insert(
+        "highlight".to_string(),
+        "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js".to_string(),
+    );
+    dependencies.insert(
+        "katex".to_string(),
+        "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js".to_string(),
+    );
+    dependencies.insert(
+        "fontawesome".to_string(),
+        "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css".to_string(),
+    );
+    dependencies.insert(
+        "anchor".to_string(),
+        "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js".to_string(),
+    );
 
     let mut styles = HashMap::new();
     let theme_names = [
-        "github", "github-dark", "gitlab", "gitlab-dark",
-        "stackoverflow", "stackoverflow-dark", "readthedocs", "readthedocs-dark",
-        "medium", "hackernews",
-        "material", "material-dark", "tailwind", "bootstrap", "bulma",
-        "shadcn", "shadcn-dark", "windows", "macos",
-        "clean", "white", "typewriter", "paper", "slate", "monochrome", "air", "book", "retro",
-        "nord", "nord-dark", "solarized-light", "solarized-dark",
-        "dracula", "monokai", "gruvbox-light", "gruvbox-dark",
-        "catppuccin-latte", "catppuccin-mocha", "tokyo-night",
-        "ayu-light", "ayu-dark", "rose-pine",
-        "everforest-light", "everforest-dark",
+        "github",
+        "github-dark",
+        "gitlab",
+        "gitlab-dark",
+        "stackoverflow",
+        "stackoverflow-dark",
+        "readthedocs",
+        "readthedocs-dark",
+        "medium",
+        "hackernews",
+        "material",
+        "material-dark",
+        "tailwind",
+        "bootstrap",
+        "bulma",
+        "shadcn",
+        "shadcn-dark",
+        "windows",
+        "macos",
+        "clean",
+        "white",
+        "typewriter",
+        "paper",
+        "slate",
+        "monochrome",
+        "air",
+        "book",
+        "retro",
+        "nord",
+        "nord-dark",
+        "solarized-light",
+        "solarized-dark",
+        "dracula",
+        "monokai",
+        "gruvbox-light",
+        "gruvbox-dark",
+        "catppuccin-latte",
+        "catppuccin-mocha",
+        "tokyo-night",
+        "ayu-light",
+        "ayu-dark",
+        "rose-pine",
+        "everforest-light",
+        "everforest-dark",
     ];
     for name in &theme_names {
         styles.insert(name.to_string(), format!("{name}.css"));
@@ -170,9 +238,12 @@ pub fn assets_base(settings: &Settings) -> PathBuf {
 pub fn ensure_dirs() -> Result<(), String> {
     let root = enginemd_dir();
     for sub in &["", "js", "css", "sites"] {
-        let p = if sub.is_empty() { root.clone() } else { root.join(sub) };
-        std::fs::create_dir_all(&p)
-            .map_err(|e| format!("cannot create {}: {e}", p.display()))?;
+        let p = if sub.is_empty() {
+            root.clone()
+        } else {
+            root.join(sub)
+        };
+        std::fs::create_dir_all(&p).map_err(|e| format!("cannot create {}: {e}", p.display()))?;
     }
     Ok(())
 }

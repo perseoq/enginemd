@@ -7,7 +7,7 @@ edition = "2021"
 clap = { version = "4", features = ["derive"] }
 axum = { version = "0.8", default-features = false, features = ["ws", "tokio", "query", "http1"] }
 tokio = { version = "1", features = ["full"] }
-tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
+tower-http = { version = "0.6", features = ["fs", "cors", "trace", "compression-gzip"] }
 comrak = { version = "0.34", default-features = false, features = ["syntect"] }
 tera = "1"
 serde = { version = "1", features = ["derive"] }
@@ -28,3 +28,6 @@ base64 = "0.22"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

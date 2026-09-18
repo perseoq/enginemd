@@ -8,6 +8,7 @@ tras reiniciar la máquina, sin necesidad de configurar un servicio a mano.
 ```bash
 enginemd daemon start      # arranca en segundo plano y activa el autoarranque
 enginemd daemon status     # estado del proceso y del autoarranque
+enginemd daemon logs       # últimas líneas del log
 enginemd daemon stop       # detiene el daemon y desactiva el autoarranque
 enginemd daemon restart    # stop + start
 ```

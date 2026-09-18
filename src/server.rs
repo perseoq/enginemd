@@ -1,16 +1,17 @@
-use std::collections::HashMap;
-use std::path::Path;
-use std::sync::Arc;
 use axum::{
-    Router,
-    extract::{Path as AxumPath, Query, State, WebSocketUpgrade, ws},
+    extract::{ws, Path as AxumPath, Query, State, WebSocketUpgrade},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::get,
+    Router,
 };
 use futures_util::{SinkExt, StreamExt};
 use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
 use tokio::sync::broadcast;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
 
@@ -75,14 +76,7 @@ pub async fn start_server(
         });
     }
 
-    let app = Router::new()
-        .route("/", get(listing_or_single_handler))
-        .route("/{*path}", get(catch_all_handler))
-        .route("/__enginemd/js/{*file}", get(js_handler))
-        .route("/__enginemd/css/{*file}", get(css_handler))
-        .route("/__enginemd/ws", get(ws_handler))
-        .layer(CorsLayer::permissive())
-        .with_state(state.clone());
+    let app = build_router(state.clone());
 
     let bind_port = override_port.unwrap_or(if watch_mode {
         settings.watch_port
@@ -101,7 +95,9 @@ pub async fn start_server(
         let dirs: Vec<String> = if let Some(ref p) = state.override_path {
             vec![p.clone()]
         } else {
-            settings.directories.iter()
+            settings
+                .directories
+                .iter()
                 .filter(|d| d.active)
                 .map(|d| d.path.clone())
                 .collect()
@@ -121,6 +117,26 @@ pub async fn start_server(
         .map_err(|e| format!("server error: {e}"))?;
 
     Ok(())
+}
+
+pub fn build_router(state: AppState) -> Router {
+    Router::new()
+        .route("/", get(listing_or_single_handler))
+        .route("/{*path}", get(catch_all_handler))
+        .route("/__enginemd/js/{*file}", get(js_handler))
+        .route("/__enginemd/css/{*file}", get(css_handler))
+        .route("/__enginemd/health", get(health_handler))
+        .route("/__enginemd/ws", get(ws_handler))
+        .layer(CompressionLayer::new())
+        .layer(CorsLayer::permissive())
+        .with_state(state)
+}
+
+async fn health_handler(State(state): State<AppState>) -> Response {
+    let body = format!("{{\"status\":\"ok\",\"watch\":{}}}", state.watch_mode);
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", "application/json".parse().unwrap());
+    (headers, body).into_response()
 }
 
 fn start_file_watcher(
@@ -197,10 +213,7 @@ fn is_ignored_path(path: &Path) -> bool {
     })
 }
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_ws(socket, state.reload_tx))
 }
 
@@ -248,17 +261,17 @@ async fn listing_or_single_handler(
     listing_handler(&state, params.get("page")).await
 }
 
-async fn listing_handler(
-    state: &AppState,
-    page_param: Option<&String>,
-) -> Response {
+async fn listing_handler(state: &AppState, page_param: Option<&String>) -> Response {
     let per_page = state.settings.listing_per_page.max(1);
     let page = page_param
         .and_then(|p| p.parse::<usize>().ok())
         .filter(|p| *p >= 1)
         .unwrap_or(1);
 
-    let active: Vec<&DirectoryEntry> = state.settings.directories.iter()
+    let active: Vec<&DirectoryEntry> = state
+        .settings
+        .directories
+        .iter()
         .filter(|d| d.active)
         .collect();
 
@@ -271,11 +284,7 @@ async fn listing_handler(
     page_start = page_end.saturating_sub(4).max(1);
 
     let start = (current_page - 1) * per_page;
-    let slice: Vec<&DirectoryEntry> = active.iter()
-        .skip(start)
-        .take(per_page)
-        .copied()
-        .collect();
+    let slice: Vec<&DirectoryEntry> = active.iter().skip(start).take(per_page).copied().collect();
 
     let mut entries = Vec::new();
     for dir in &slice {
@@ -290,7 +299,9 @@ async fn listing_handler(
         });
     }
 
-    let css_file = state.settings.styles
+    let css_file = state
+        .settings
+        .styles
         .get(&state.settings.listing_css)
         .cloned()
         .unwrap_or_else(|| format!("{}.css", state.settings.listing_css));
@@ -348,9 +359,13 @@ async fn serve_single_site(
     let config = PageConfig {
         css: state.override_css.as_deref().unwrap_or("github"),
         js_support: state.override_js.as_ref(),
-        lang: state.override_lang.as_deref().unwrap_or(&state.settings.lang),
+        lang: state
+            .override_lang
+            .as_deref()
+            .unwrap_or(&state.settings.lang),
         site_title: &site_name,
         url_prefix: "/".to_string(),
+        asset_prefix: "/__enginemd/".to_string(),
         obsidian: state.obsidian_enabled(None, site_path),
     };
     serve_internal(state, site_path, sub_path, &config).await
@@ -366,14 +381,19 @@ async fn catch_all_handler(
 
     let (site_name, remainder) = path.split_once('/').unwrap_or((&path, ""));
 
-    let dir_entry = state.settings.directories.iter()
+    let dir_entry = state
+        .settings
+        .directories
+        .iter()
         .find(|d| d.name == site_name && d.active)
         .cloned();
 
     match dir_entry {
         Some(entry) => serve_path_with_config(&state, &entry, remainder).await,
         None => {
-            let css_file = state.settings.styles
+            let css_file = state
+                .settings
+                .styles
                 .get(&state.settings.listing_css)
                 .cloned()
                 .unwrap_or_else(|| format!("{}.css", state.settings.listing_css));
@@ -388,11 +408,7 @@ async fn catch_all_handler(
     }
 }
 
-async fn serve_path_with_config(
-    state: &AppState,
-    entry: &DirectoryEntry,
-    path: &str,
-) -> Response {
+async fn serve_path_with_config(state: &AppState, entry: &DirectoryEntry, path: &str) -> Response {
     let site_path = &entry.path;
     let css = entry.css.as_deref().unwrap_or("github");
     let js_support = state.override_js.as_ref().or(entry.js_support.as_ref());
@@ -404,6 +420,7 @@ async fn serve_path_with_config(
         lang,
         site_title: &entry.name,
         url_prefix: format!("/{}/", entry.name),
+        asset_prefix: "/__enginemd/".to_string(),
         obsidian: state.obsidian_enabled(entry.obsidian, site_path),
     };
 
@@ -416,6 +433,7 @@ struct PageConfig<'a> {
     lang: &'a str,
     site_title: &'a str,
     url_prefix: String,
+    asset_prefix: String,
     obsidian: bool,
 }
 
@@ -442,7 +460,7 @@ impl AppState {
     }
 }
 
-fn site_uses_obsidian_syntax(root: &Path) -> bool {
+pub(crate) fn site_uses_obsidian_syntax(root: &Path) -> bool {
     const MAX_BYTES: u64 = 8 * 1024 * 1024;
 
     let mut bytes = 0u64;
@@ -513,7 +531,11 @@ async fn serve_internal(
                 return render_file(state, site_path, &file, config, None).await;
             }
         }
-        let css_file = state.settings.styles.get(config.css).cloned()
+        let css_file = state
+            .settings
+            .styles
+            .get(config.css)
+            .cloned()
             .unwrap_or_else(|| format!("{}.css", config.css));
         let html = state.templates.render_error(
             404,
@@ -550,7 +572,11 @@ async fn serve_internal(
         }
     }
 
-    let css_file = state.settings.styles.get(config.css).cloned()
+    let css_file = state
+        .settings
+        .styles
+        .get(config.css)
+        .cloned()
         .unwrap_or_else(|| format!("{}.css", config.css));
     let html = state.templates.render_error(
         404,
@@ -609,10 +635,14 @@ async fn render_file(
     config: &PageConfig<'_>,
     base_url: Option<&str>,
 ) -> Response {
-    let content = match std::fs::read_to_string(file_path) {
+    let content = match tokio::fs::read_to_string(file_path).await {
         Ok(c) => c,
         Err(e) => {
-            let css_file = state.settings.styles.get(config.css).cloned()
+            let css_file = state
+                .settings
+                .styles
+                .get(config.css)
+                .cloned()
                 .unwrap_or_else(|| format!("{}.css", config.css));
             let html = state.templates.render_error(
                 500,
@@ -646,15 +676,21 @@ async fn render_file(
     let mut fm = Frontmatter::default();
     let html_body = render_markdown(&content, &mut fm, render_ctx.as_ref());
 
-    let title = fm.title.as_deref().map(|s| s.to_string())
+    let title = fm
+        .title
+        .as_deref()
+        .map(|s| s.to_string())
         .or_else(|| renderer::extract_first_heading(&content));
     let title = title.as_deref();
     let description = fm.description.as_deref();
     let page_lang = fm.lang.as_deref().unwrap_or(config.lang);
+    let body_class = fm.cssclasses.join(" ");
 
     let js_assets = resolve_assets(state, config, &content).await;
 
-    let css_file = state.settings.styles
+    let css_file = state
+        .settings
+        .styles
         .get(config.css)
         .cloned()
         .unwrap_or_else(|| format!("{}.css", config.css));
@@ -667,6 +703,9 @@ async fn render_file(
         page_lang,
         &css_file,
         base_url,
+        &body_class,
+        &fm.tags,
+        &config.asset_prefix,
         &js_assets.extra_css,
         &js_assets.head_scripts,
         &js_assets.head_inline,
@@ -740,13 +779,13 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
                     continue;
                 }
             };
-            let version = version_token(&hash);
+            let version = assets::version_token(&hash);
             let integrity = if sri { Some(hash) } else { None };
 
             match file.kind {
                 FileKind::Js => {
                     let script = ScriptAsset {
-                        src: format!("/__enginemd/js/{}?v={}", file.local, version),
+                        src: format!("{}js/{}?v={}", config.asset_prefix, file.local, version),
                         integrity,
                     };
                     match spec.position {
@@ -755,7 +794,7 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
                     }
                 }
                 FileKind::Css => out.extra_css.push(CssAsset {
-                    href: format!("/__enginemd/css/{}?v={}", file.local, version),
+                    href: format!("{}css/{}?v={}", config.asset_prefix, file.local, version),
                     integrity,
                 }),
             }
@@ -769,26 +808,24 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
     out
 }
 
-fn version_token(hash: &str) -> String {
-    hash.chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .skip("sha384".len())
-        .take(16)
-        .collect()
-}
-
 async fn serve_static_file(path: &Path) -> Response {
     let mime = mime_guess::from_path(path).first_or_octet_stream();
+    let modified = tokio::fs::metadata(path)
+        .await
+        .ok()
+        .and_then(|m| m.modified().ok());
     match tokio::fs::read(path).await {
         Ok(data) => {
-            let headers = {
-                let mut h = HeaderMap::new();
-                h.insert(
-                    "Content-Type",
-                    mime.to_string().parse().unwrap(),
-                );
-                h
-            };
+            let mut headers = HeaderMap::new();
+            headers.insert("Content-Type", mime.to_string().parse().unwrap());
+            headers.insert("Cache-Control", "no-cache".parse().unwrap());
+            headers.insert("Content-Length", data.len().to_string().parse().unwrap());
+            if let Some(t) = modified {
+                let dt: chrono::DateTime<chrono::Utc> = t.into();
+                if let Ok(v) = dt.format("%a, %d %b %Y %H:%M:%S GMT").to_string().parse() {
+                    headers.insert("Last-Modified", v);
+                }
+            }
             (headers, data).into_response()
         }
         Err(_) => (StatusCode::NOT_FOUND, "File not found").into_response(),
@@ -869,10 +906,7 @@ async fn serve_local_file(file_path: &Path, versioned: bool) -> Response {
         Ok(data) => {
             let headers = {
                 let mut h = HeaderMap::new();
-                h.insert(
-                    "Content-Type",
-                    mime.to_string().parse().unwrap(),
-                );
+                h.insert("Content-Type", mime.to_string().parse().unwrap());
                 h.insert("Cache-Control", cache_header(versioned).parse().unwrap());
                 h
             };
@@ -900,7 +934,10 @@ mod tests {
         let base = Path::new("/tmp");
         assert!(safe_join(base, "../etc/passwd").is_none());
         assert!(safe_join(base, "/etc/passwd").is_none());
-        assert_eq!(safe_join(base, "docs/a.md"), Some(Path::new("/tmp/docs/a.md").to_path_buf()));
+        assert_eq!(
+            safe_join(base, "docs/a.md"),
+            Some(Path::new("/tmp/docs/a.md").to_path_buf())
+        );
     }
 
     #[test]
@@ -935,5 +972,70 @@ mod tests {
         assert!(site_uses_obsidian_syntax(&base));
 
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    fn test_state() -> AppState {
+        let mut settings = config::default_settings();
+        let base = std::env::temp_dir().join(format!("enginemd-http-{}", std::process::id()));
+        settings.assets_dir = Some(base.to_string_lossy().to_string());
+        AppState {
+            settings,
+            templates: Arc::new(TemplateEngine::new(false)),
+            watch_mode: false,
+            reload_tx: broadcast::channel(10).0,
+            override_path: None,
+            override_lang: None,
+            override_js: None,
+            override_css: None,
+            vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            assets: Arc::new(AssetManager::new(base.clone(), None, Vec::new())),
+            assets_base: base,
+        }
+    }
+
+    async fn get(app: Router, uri: &str) -> (StatusCode, HeaderMap, String) {
+        use axum::body::Body;
+        use tower::ServiceExt;
+        let request = axum::http::Request::builder()
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, headers, String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_ok() {
+        let (status, _headers, body) = get(build_router(test_state()), "/__enginemd/health").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("\"status\":\"ok\""));
+    }
+
+    #[tokio::test]
+    async fn base_css_has_cache_control() {
+        let (status, headers, body) =
+            get(build_router(test_state()), "/__enginemd/css/base.css").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(headers.get("cache-control").is_some());
+        assert!(body.contains("--body-bg"));
+    }
+
+    #[tokio::test]
+    async fn unknown_js_support_key_does_not_panic() {
+        let mut state = test_state();
+        state.override_js = Some(vec!["noexiste".to_string()]);
+        let site = std::env::temp_dir().join(format!("enginemd-http-site-{}", std::process::id()));
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.md"), "# Hi\n").unwrap();
+        state.override_path = Some(site.to_string_lossy().to_string());
+        let (status, _headers, body) = get(build_router(state), "/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("<h1"));
     }
 }
