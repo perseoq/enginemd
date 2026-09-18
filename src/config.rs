@@ -32,6 +32,14 @@ pub struct Settings {
     pub cdn_fallbacks: Vec<String>,
     #[serde(default = "default_theme_source")]
     pub theme_source: String,
+    #[serde(default = "default_app_title")]
+    pub app_title: String,
+    #[serde(default = "default_listing_subtitle")]
+    pub listing_subtitle: String,
+    #[serde(default = "default_home_label")]
+    pub home_label: String,
+    #[serde(default = "default_footer_text")]
+    pub footer_text: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -66,6 +74,18 @@ fn default_true() -> bool {
 }
 fn default_theme_source() -> String {
     "auto".to_string()
+}
+fn default_app_title() -> String {
+    "EngineMD".to_string()
+}
+fn default_listing_subtitle() -> String {
+    "Sites".to_string()
+}
+fn default_home_label() -> String {
+    "Sites".to_string()
+}
+fn default_footer_text() -> String {
+    "EngineMD — Markdown to HTML server".to_string()
 }
 
 pub fn enginemd_dir() -> PathBuf {
@@ -224,6 +244,10 @@ pub fn default_settings() -> Settings {
         cdn_base: None,
         cdn_fallbacks: Vec::new(),
         theme_source: "auto".to_string(),
+        app_title: default_app_title(),
+        listing_subtitle: default_listing_subtitle(),
+        home_label: default_home_label(),
+        footer_text: default_footer_text(),
     }
 }
 

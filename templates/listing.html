@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <title>EngineMD - Sites</title>
+  <title>{{ app_title }} - {{ listing_subtitle }}</title>
   <link rel="stylesheet" href="/__enginemd/css/base.css">
   <link rel="stylesheet" href="/__enginemd/css/{{ listing_css }}">
   <script>
@@ -28,7 +28,7 @@
 <body>
   <header class="listing-header">
     <button id="theme-toggle" class="theme-toggle" type="button" title="Tema">Auto</button>
-    <h1>EngineMD <span class="subtitle">Sites</span></h1>
+    <h1>{{ app_title }} <span class="subtitle">{{ listing_subtitle }}</span></h1>
     <p class="count">{{ total }} site(s) registered</p>
   </header>
 
@@ -96,24 +96,23 @@
   </main>
 
   <footer class="listing-footer">
-    <p>EngineMD &mdash; Markdown to HTML server</p>
+    <p>{{ footer_text }}</p>
   </footer>
   <script>
     (function() {
       var root = document.documentElement;
-      var toggle = document.getElementById('theme-toggle');
-      if (!toggle) { return; }
       var labels = { auto: 'Auto', light: 'Claro', dark: 'Oscuro' };
       var order = ['auto', 'light', 'dark'];
-      function current() {
-        var s = null;
-        try { s = localStorage.getItem('enginemd-theme'); } catch (e) {}
-        return (s === 'light' || s === 'dark') ? s : 'auto';
-      }
       function isLocal() {
         var h = location.hostname;
         return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
       }
+      function override() {
+        var s = null;
+        try { s = localStorage.getItem('enginemd-theme'); } catch (e) {}
+        return (s === 'light' || s === 'dark') ? s : null;
+      }
+      function current() { return override() || 'auto'; }
       function apply(mode) {
         if (mode === 'auto') {
           try { localStorage.removeItem('enginemd-theme'); } catch (e) {}
@@ -126,13 +125,34 @@
           try { localStorage.setItem('enginemd-theme', mode); } catch (e) {}
           root.setAttribute('data-theme', mode);
         }
-        toggle.textContent = labels[mode];
+        var toggle = document.getElementById('theme-toggle');
+        if (toggle) { toggle.textContent = labels[mode]; }
       }
-      toggle.textContent = labels[current()];
-      toggle.addEventListener('click', function() {
-        var m = current();
-        apply(order[(order.indexOf(m) + 1) % order.length]);
-      });
+      var toggle = document.getElementById('theme-toggle');
+      if (toggle) {
+        toggle.textContent = labels[current()];
+        toggle.addEventListener('click', function() {
+          var m = current();
+          apply(order[(order.indexOf(m) + 1) % order.length]);
+        });
+      }
+      var themeSource = root.getAttribute('data-theme-source');
+      if (themeSource === 'system' || (themeSource === 'auto' && isLocal())) {
+        setInterval(function() {
+          if (override()) { return; }
+          fetch('/__enginemd/theme', { cache: 'no-store' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (override()) { return; }
+              if (d && (d.theme === 'dark' || d.theme === 'light')) {
+                root.setAttribute('data-theme', d.theme);
+              } else if (d && d.theme === null) {
+                root.removeAttribute('data-theme');
+              }
+            })
+            .catch(function() {});
+        }, 3000);
+      }
     })();
   </script>
 </body>

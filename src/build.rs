@@ -152,6 +152,7 @@ async fn build_site(
                 &inline,
                 &body_scripts,
                 false,
+                &settings.home_label,
                 &crate::template::ThemeContext {
                     source: "browser".to_string(),
                     default: None,

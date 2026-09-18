@@ -37,7 +37,7 @@
 </head>
 <body{% if body_class %} class="{{ body_class }}"{% endif %}>
   <nav class="top-bar">
-    <a href="/" class="home-link">&larr; Sites</a>
+    <a href="/" class="home-link">&larr; {{ home_label }}</a>
     <span class="site-label">{{ site_title }}</span>
     {% if title %}<span class="page-title">&mdash; {{ title }}</span>{% endif %}
     {% if description %}<span class="page-desc">{{ description }}</span>{% endif %}
@@ -95,38 +95,57 @@
       });
 
       var root = document.documentElement;
+      var labels = { auto: 'Auto', light: 'Claro', dark: 'Oscuro' };
+      var order = ['auto', 'light', 'dark'];
+      function isLocal() {
+        var h = location.hostname;
+        return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
+      }
+      function override() {
+        var s = null;
+        try { s = localStorage.getItem('enginemd-theme'); } catch (e) {}
+        return (s === 'light' || s === 'dark') ? s : null;
+      }
+      function current() { return override() || 'auto'; }
+      function apply(mode) {
+        if (mode === 'auto') {
+          try { localStorage.removeItem('enginemd-theme'); } catch (e) {}
+          var source = root.getAttribute('data-theme-source');
+          var def = root.getAttribute('data-theme-default');
+          if (source === 'system' && def) { root.setAttribute('data-theme', def); }
+          else if (source === 'auto' && def && isLocal()) { root.setAttribute('data-theme', def); }
+          else { root.removeAttribute('data-theme'); }
+        } else {
+          try { localStorage.setItem('enginemd-theme', mode); } catch (e) {}
+          root.setAttribute('data-theme', mode);
+        }
+        var toggle = document.getElementById('theme-toggle');
+        if (toggle) { toggle.textContent = labels[mode]; }
+      }
       var toggle = document.getElementById('theme-toggle');
       if (toggle) {
-        var labels = { auto: 'Auto', light: 'Claro', dark: 'Oscuro' };
-        var order = ['auto', 'light', 'dark'];
-        function current() {
-          var s = null;
-          try { s = localStorage.getItem('enginemd-theme'); } catch (e) {}
-          return (s === 'light' || s === 'dark') ? s : 'auto';
-        }
-        function isLocal() {
-          var h = location.hostname;
-          return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
-        }
-        function apply(mode) {
-          if (mode === 'auto') {
-            try { localStorage.removeItem('enginemd-theme'); } catch (e) {}
-            var source = root.getAttribute('data-theme-source');
-            var def = root.getAttribute('data-theme-default');
-            if (source === 'system' && def) { root.setAttribute('data-theme', def); }
-            else if (source === 'auto' && def && isLocal()) { root.setAttribute('data-theme', def); }
-            else { root.removeAttribute('data-theme'); }
-          } else {
-            try { localStorage.setItem('enginemd-theme', mode); } catch (e) {}
-            root.setAttribute('data-theme', mode);
-          }
-          toggle.textContent = labels[mode];
-        }
         toggle.textContent = labels[current()];
         toggle.addEventListener('click', function() {
           var m = current();
           apply(order[(order.indexOf(m) + 1) % order.length]);
         });
+      }
+      var themeSource = root.getAttribute('data-theme-source');
+      if (themeSource === 'system' || (themeSource === 'auto' && isLocal())) {
+        setInterval(function() {
+          if (override()) { return; }
+          fetch('/__enginemd/theme', { cache: 'no-store' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (override()) { return; }
+              if (d && (d.theme === 'dark' || d.theme === 'light')) {
+                root.setAttribute('data-theme', d.theme);
+              } else if (d && d.theme === null) {
+                root.removeAttribute('data-theme');
+              }
+            })
+            .catch(function() {});
+        }, 3000);
       }
     })();
   </script>

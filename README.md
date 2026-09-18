@@ -9,7 +9,7 @@ y soporte de bóvedas de Obsidian.
 ## Características
 
 - Markdown (comrak) con tablas, notas al pie, tasklists y autolinks.
-- **Tema automático**: claro = VS Code Light+, oscuro = Dracula; detecta el tema del PC y tiene conmutador.
+- **Tema automático**: claro = VS Code Light+, oscuro = Dracula; detecta el tema del PC, se actualiza en vivo y tiene conmutador.
 - Resaltado de código en servidor (syntect).
 - **Assets self-hosted**: MathJax, KaTeX, Mermaid, Chart.js, highlight, anchor y
   Font Awesome se descargan y se sirven localmente (funciona offline).
@@ -18,6 +18,7 @@ y soporte de bóvedas de Obsidian.
 - **Hot-reload** (`--watch`) y **modo daemon** con autoarranque.
 - **Export estático** (`build`) para GitHub Pages.
 - TOC plegable, botón de copiar, compresión gzip y healthcheck.
+- Títulos, subtítulo, enlace de inicio y footer **personalizables** en `settings.json`.
 
 ## Instalación
 

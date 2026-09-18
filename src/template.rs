@@ -32,6 +32,9 @@ impl TemplateEngine {
         total: usize,
         page_start: usize,
         page_end: usize,
+        app_title: &str,
+        listing_subtitle: &str,
+        footer_text: &str,
         theme: &ThemeContext,
     ) -> String {
         let mut ctx = Context::new();
@@ -43,6 +46,9 @@ impl TemplateEngine {
         ctx.insert("total", &total);
         ctx.insert("page_start", &page_start);
         ctx.insert("page_end", &page_end);
+        ctx.insert("app_title", app_title);
+        ctx.insert("listing_subtitle", listing_subtitle);
+        ctx.insert("footer_text", footer_text);
         insert_theme(&mut ctx, theme);
 
         self.tera
@@ -68,6 +74,7 @@ impl TemplateEngine {
         head_inline: &[String],
         body_scripts: &[crate::assets::ScriptAsset],
         watch_mode: bool,
+        home_label: &str,
         theme: &ThemeContext,
     ) -> String {
         let mut ctx = Context::new();
@@ -86,6 +93,7 @@ impl TemplateEngine {
         ctx.insert("head_inline", head_inline);
         ctx.insert("body_scripts", body_scripts);
         ctx.insert("watch_mode", &watch_mode);
+        ctx.insert("home_label", home_label);
         insert_theme(&mut ctx, theme);
 
         self.tera
@@ -99,6 +107,7 @@ impl TemplateEngine {
         message: &str,
         lang: &str,
         css_theme: &str,
+        app_title: &str,
         theme: &ThemeContext,
     ) -> String {
         let mut ctx = Context::new();
@@ -106,6 +115,7 @@ impl TemplateEngine {
         ctx.insert("message", message);
         ctx.insert("lang", lang);
         ctx.insert("css_theme", css_theme);
+        ctx.insert("app_title", app_title);
         insert_theme(&mut ctx, theme);
 
         self.tera.render("error", &ctx).unwrap_or_else(|e| {

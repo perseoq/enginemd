@@ -288,6 +288,11 @@ El servidor detecta el tema del escritorio en Linux (`gsettings`/portal/GTK) y
 lo inyecta como `data-theme`; para clientes remotos no lo impone (usa el
 navegador). En **Windows/macOS** el navegador ya sigue al sistema.
 
+En `auto` (cliente local) y `system`, la página se **actualiza en vivo**: el
+cliente consulta `GET /__enginemd/theme` cada ~3 s y cambia el tema sin
+recargar. En `browser` reacciona al instante a `prefers-color-scheme` del
+navegador.
+
 Además hay un **conmutador** en la barra superior (`Auto → Claro → Oscuro`),
 persistido en el navegador, para forzar el tema. También se adaptan el
 resaltado de código (syntect) y los callouts.
@@ -310,6 +315,10 @@ conmutador o pon `theme_source` y el escritorio en oscuro
   "auto_fetch": true,
   "sri": true,
   "theme_source": "auto",
+  "app_title": "EngineMD",
+  "listing_subtitle": "Sites",
+  "home_label": "Sites",
+  "footer_text": "EngineMD — Markdown to HTML server",
   "assets_dir": "/home/user/.enginemd",
   "cdn_base": "https://cdn.jsdelivr.net/npm",
   "cdn_fallbacks": ["https://unpkg.com"],
@@ -320,6 +329,30 @@ conmutador o pon `theme_source` y el escritorio en oscuro
   ]
 }
 ```
+
+### Personalización de textos
+
+En `~/.enginemd/settings.json` puedes cambiar los textos de la interfaz:
+
+| Campo | Por defecto | Dónde se muestra |
+|-------|-------------|------------------|
+| `app_title` | `"EngineMD"` | `<title>` y encabezado del listado; título de errores |
+| `listing_subtitle` | `"Sites"` | subtítulo del listado |
+| `home_label` | `"Sites"` | enlace “← Sites” de la barra superior |
+| `footer_text` | `"EngineMD — Markdown to HTML server"` | pie del listado |
+
+Ejemplo:
+
+```json
+{
+  "app_title": "Mi Documentación",
+  "listing_subtitle": "Sitios",
+  "home_label": "Inicio",
+  "footer_text": "Mi Documentación — hecho con EngineMD"
+}
+```
+
+Los cambios se aplican al reiniciar el servidor.
 
 ## Docker y CI
 

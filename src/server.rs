@@ -127,6 +127,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/__enginemd/js/{*file}", get(js_handler))
         .route("/__enginemd/css/{*file}", get(css_handler))
         .route("/__enginemd/health", get(health_handler))
+        .route("/__enginemd/theme", get(theme_handler))
         .route("/__enginemd/ws", get(ws_handler))
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive())
@@ -137,6 +138,21 @@ async fn health_handler(State(state): State<AppState>) -> Response {
     let body = format!("{{\"status\":\"ok\",\"watch\":{}}}", state.watch_mode);
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse().unwrap());
+    (headers, body).into_response()
+}
+
+async fn theme_handler(State(state): State<AppState>) -> Response {
+    let theme = state
+        .theme_cache
+        .get()
+        .map(|dark| if dark { "dark" } else { "light" });
+    let body = match theme {
+        Some(t) => format!("{{\"theme\":\"{t}\"}}"),
+        None => "{\"theme\":null}".to_string(),
+    };
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", "application/json".parse().unwrap());
+    headers.insert("Cache-Control", "no-store".parse().unwrap());
     (headers, body).into_response()
 }
 
@@ -311,6 +327,9 @@ async fn listing_handler(state: &AppState, page_param: Option<&String>) -> Respo
         total,
         page_start,
         page_end,
+        &state.settings.app_title,
+        &state.settings.listing_subtitle,
+        &state.settings.footer_text,
         &theme_ctx(state),
     );
 
@@ -393,6 +412,7 @@ async fn catch_all_handler(
                 &format!("Site '{}' not found or inactive.", site_name),
                 &state.settings.lang,
                 "auto.css",
+                &state.settings.app_title,
                 &theme_ctx(&state),
             );
             (StatusCode::NOT_FOUND, Html(html)).into_response()
@@ -547,6 +567,7 @@ async fn serve_internal(
             "No index.md or init.md found in this site.",
             config.lang,
             &css_file,
+            &state.settings.app_title,
             &theme_ctx(state),
         );
         return (StatusCode::NOT_FOUND, Html(html)).into_response();
@@ -589,6 +610,7 @@ async fn serve_internal(
         &format!("Page '{}' not found.", path),
         config.lang,
         &css_file,
+        &state.settings.app_title,
         &theme_ctx(state),
     );
     (StatusCode::NOT_FOUND, Html(html)).into_response()
@@ -656,6 +678,7 @@ async fn render_file(
                 &format!("Cannot read file: {e}"),
                 config.lang,
                 &css_file,
+                &state.settings.app_title,
                 &theme_ctx(state),
             );
             return (StatusCode::INTERNAL_SERVER_ERROR, Html(html)).into_response();
@@ -719,6 +742,7 @@ async fn render_file(
         &js_assets.head_inline,
         &js_assets.body_scripts,
         state.watch_mode,
+        &state.settings.home_label,
         &theme_ctx(state),
     );
 
@@ -1069,6 +1093,14 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn theme_endpoint_ok() {
+        let (status, headers, body) = get(build_router(test_state()), "/__enginemd/theme").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(headers.get("cache-control").is_some());
+        assert!(body.contains("\"theme\""));
+    }
+
+    #[tokio::test]
     async fn page_includes_theme_toggle() {
         let site = std::env::temp_dir().join(format!("enginemd-theme-{}", std::process::id()));
         std::fs::create_dir_all(&site).unwrap();
@@ -1080,6 +1112,32 @@ mod tests {
         assert!(body.contains("id=\"theme-toggle\""));
         assert!(body.contains("data-theme-source="));
         assert!(body.contains("color-scheme"));
+    }
+
+    #[tokio::test]
+    async fn listing_uses_configured_titles() {
+        let mut state = test_state();
+        state.settings.app_title = "Mi App".to_string();
+        state.settings.listing_subtitle = "Sitios".to_string();
+        state.settings.footer_text = "Pie personalizado".to_string();
+        let (status, _headers, body) = get(build_router(state), "/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("Mi App"));
+        assert!(body.contains("Sitios"));
+        assert!(body.contains("Pie personalizado"));
+    }
+
+    #[tokio::test]
+    async fn page_uses_configured_home_label() {
+        let site = std::env::temp_dir().join(format!("enginemd-home-{}", std::process::id()));
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.md"), "# Hi\n").unwrap();
+        let mut state = test_state();
+        state.settings.home_label = "Inicio".to_string();
+        state.override_path = Some(site.to_string_lossy().to_string());
+        let (status, _headers, body) = get(build_router(state), "/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("Inicio"));
     }
 
     #[tokio::test]
