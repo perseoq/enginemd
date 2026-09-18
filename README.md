@@ -61,8 +61,11 @@ plano (y también se descarga bajo demanda si falta). Los archivos se guardan en
   ```chart, `$...$`, etc.), aunque no esté en `--js-support`.
 - `--js-support` es una **allowlist** de claves del catálogo (override global).
 - **SRI** activo por defecto (`sri: false` para desactivarlo) y `defer`.
+- **Cache-Control**: los assets se sirven con `?v=<hash>` y `immutable`; los temas generados usan `no-cache`.
 - Si un asset no está y no se puede descargar, se **avisa y se omite**.
 - `enginemd fetch --force` fuerza la re-descarga.
+- **`assets_dir`**: cambia la carpeta del caché (por defecto `~/.enginemd`).
+- **`cdn_base` / `cdn_fallbacks`**: fuente(s) de descarga (por defecto jsdelivr; sirve cualquier base compatible con `/paquete@version/archivo`, p. ej. unpkg). Si la primera falla, se prueban las de `cdn_fallbacks`.
 
 Catálogo actual: `mathjax`, `katex`, `mermaid`, `chartjs`, `highlight`, `anchor`,
 `fontawesome`. El resaltado de código es server-side (syntect) por defecto.
@@ -166,6 +169,9 @@ Se configuran por sitio en `~/.enginemd/settings.json`:
   "listing_per_page": 20,
   "auto_fetch": true,
   "sri": true,
+  "assets_dir": "/home/user/.enginemd",
+  "cdn_base": "https://cdn.jsdelivr.net/npm",
+  "cdn_fallbacks": ["https://unpkg.com"],
   "styles": {
     "github": "github.css",
     "dark": "dark.css",

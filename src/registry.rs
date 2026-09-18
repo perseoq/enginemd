@@ -1,9 +1,13 @@
 use crate::assets::{AssetManager, CATALOG};
 
 pub async fn cmd_fetch(force: bool) -> Result<(), String> {
-    let manager = AssetManager::new(crate::config::enginemd_dir());
     let settings = crate::config::load_settings();
-    let css_dir = crate::config::css_dir();
+    let manager = AssetManager::new(
+        crate::config::assets_base(&settings),
+        settings.cdn_base.clone(),
+        settings.cdn_fallbacks.clone(),
+    );
+    let css_dir = crate::config::assets_base(&settings).join("css");
 
     std::fs::create_dir_all(&css_dir).map_err(|e| format!("cannot create css dir: {e}"))?;
 

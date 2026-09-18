@@ -26,6 +26,12 @@ pub struct Settings {
     pub auto_fetch: bool,
     #[serde(default = "default_true")]
     pub sri: bool,
+    #[serde(default)]
+    pub assets_dir: Option<String>,
+    #[serde(default)]
+    pub cdn_base: Option<String>,
+    #[serde(default)]
+    pub cdn_fallbacks: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -58,14 +64,6 @@ pub fn enginemd_dir() -> PathBuf {
 
 pub fn settings_path() -> PathBuf {
     enginemd_dir().join("settings.json")
-}
-
-pub fn js_dir() -> PathBuf {
-    enginemd_dir().join("js")
-}
-
-pub fn css_dir() -> PathBuf {
-    enginemd_dir().join("css")
 }
 
 pub fn sites_dir() -> PathBuf {
@@ -155,6 +153,17 @@ pub fn default_settings() -> Settings {
         obsidian: false,
         auto_fetch: true,
         sri: true,
+        assets_dir: None,
+        cdn_base: None,
+        cdn_fallbacks: Vec::new(),
+    }
+}
+
+/// Base directory for downloaded assets (js/, css/, assets.json).
+pub fn assets_base(settings: &Settings) -> PathBuf {
+    match &settings.assets_dir {
+        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
+        _ => enginemd_dir(),
     }
 }
 

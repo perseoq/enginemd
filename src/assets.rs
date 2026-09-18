@@ -195,10 +195,12 @@ pub struct AssetManager {
     manifest_path: PathBuf,
     manifest: RwLock<HashMap<String, String>>,
     inflight: tokio::sync::Mutex<HashSet<String>>,
+    primary_base: Option<String>,
+    fallbacks: Vec<String>,
 }
 
 impl AssetManager {
-    pub fn new(base: PathBuf) -> Self {
+    pub fn new(base: PathBuf, primary_base: Option<String>, fallbacks: Vec<String>) -> Self {
         let js_dir = base.join("js");
         let css_dir = base.join("css");
         let manifest_path = base.join("assets.json");
@@ -216,7 +218,24 @@ impl AssetManager {
             manifest_path,
             manifest: RwLock::new(manifest),
             inflight: tokio::sync::Mutex::new(HashSet::new()),
+            primary_base: primary_base.filter(|b| !b.trim().is_empty()),
+            fallbacks: fallbacks
+                .into_iter()
+                .filter(|b| !b.trim().is_empty())
+                .collect(),
         }
+    }
+
+    fn candidates(&self, url: &str) -> Vec<String> {
+        let mut list = Vec::new();
+        match &self.primary_base {
+            Some(base) => list.push(with_base(url, base)),
+            None => list.push(url.to_string()),
+        }
+        for base in &self.fallbacks {
+            list.push(with_base(url, base));
+        }
+        list
     }
 
     fn dir_for(&self, kind: FileKind) -> &Path {
@@ -266,7 +285,7 @@ impl AssetManager {
             }
         }
 
-        let result = download(url, &path).await;
+        let result = download(&self.candidates(url), &path).await;
         self.inflight.lock().await.remove(&lock_key);
 
         match result {
@@ -334,7 +353,26 @@ fn hash_file(path: &Path) -> Result<String, String> {
     ))
 }
 
-async fn download(url: &str, path: &Path) -> Result<(), String> {
+fn with_base(url: &str, base: &str) -> String {
+    const PREFIX: &str = "https://cdn.jsdelivr.net/npm/";
+    match url.strip_prefix(PREFIX) {
+        Some(rest) => format!("{}/{}", base.trim_end_matches('/'), rest),
+        None => url.to_string(),
+    }
+}
+
+async fn download(urls: &[String], path: &Path) -> Result<(), String> {
+    let mut last_err = "no download source".to_string();
+    for url in urls {
+        match download_one(url, path).await {
+            Ok(()) => return Ok(()),
+            Err(e) => last_err = e,
+        }
+    }
+    Err(last_err)
+}
+
+async fn download_one(url: &str, path: &Path) -> Result<(), String> {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     let client = CLIENT.get_or_init(|| {
         reqwest::Client::builder()
@@ -400,6 +438,24 @@ mod tests {
         for spec in CATALOG {
             assert!(keys.insert(spec.key), "duplicate key {}", spec.key);
         }
+    }
+
+    #[test]
+    fn rewrites_cdn_base() {
+        assert_eq!(
+            with_base(
+                "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js",
+                "https://unpkg.com"
+            ),
+            "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"
+        );
+        assert_eq!(
+            with_base(
+                "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js",
+                "http://mirror.local/npm/"
+            ),
+            "http://mirror.local/npm/mermaid@11/dist/mermaid.min.js"
+        );
     }
 }
 

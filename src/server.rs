@@ -34,6 +34,7 @@ pub struct AppState {
     pub vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
     pub obsidian_detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
     pub assets: Arc<AssetManager>,
+    pub assets_base: std::path::PathBuf,
 }
 
 pub async fn start_server(
@@ -59,7 +60,12 @@ pub async fn start_server(
         override_css,
         vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
         obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
-        assets: Arc::new(AssetManager::new(config::enginemd_dir())),
+        assets: Arc::new(AssetManager::new(
+            config::assets_base(&settings),
+            settings.cdn_base.clone(),
+            settings.cdn_fallbacks.clone(),
+        )),
+        assets_base: config::assets_base(&settings),
     };
 
     if settings.auto_fetch {
@@ -734,12 +740,13 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
                     continue;
                 }
             };
+            let version = version_token(&hash);
             let integrity = if sri { Some(hash) } else { None };
 
             match file.kind {
                 FileKind::Js => {
                     let script = ScriptAsset {
-                        src: format!("/__enginemd/js/{}", file.local),
+                        src: format!("/__enginemd/js/{}?v={}", file.local, version),
                         integrity,
                     };
                     match spec.position {
@@ -748,7 +755,7 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
                     }
                 }
                 FileKind::Css => out.extra_css.push(CssAsset {
-                    href: format!("/__enginemd/css/{}", file.local),
+                    href: format!("/__enginemd/css/{}?v={}", file.local, version),
                     integrity,
                 }),
             }
@@ -760,6 +767,14 @@ async fn resolve_assets(state: &AppState, config: &PageConfig<'_>, body: &str) -
     }
 
     out
+}
+
+fn version_token(hash: &str) -> String {
+    hash.chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .skip("sha384".len())
+        .take(16)
+        .collect()
 }
 
 async fn serve_static_file(path: &Path) -> Response {
@@ -781,31 +796,36 @@ async fn serve_static_file(path: &Path) -> Response {
 }
 
 async fn js_handler(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     AxumPath(file): AxumPath<String>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> Response {
-    let js_dir = config::js_dir();
+    let js_dir = state.assets_base.join("js");
+    let versioned = params.contains_key("v");
     match safe_join(&js_dir, &file) {
-        Some(file_path) => serve_local_file(&file_path).await,
+        Some(file_path) => serve_local_file(&file_path, versioned).await,
         None => (StatusCode::BAD_REQUEST, "Invalid path").into_response(),
     }
 }
 
 async fn css_handler(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     AxumPath(file): AxumPath<String>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> Response {
+    let versioned = params.contains_key("v");
+
     // 1. Serve base.css from bundled assets
     if file == "base.css" {
         let bundled = include_str!("../css/base.css");
-        return serve_css(bundled);
+        return serve_css(bundled, false);
     }
 
-    // 2. Try file from ~/.enginemd/css/ (user custom themes)
-    let css_dir = config::css_dir();
+    // 2. Try file from the assets dir (downloaded or user custom themes)
+    let css_dir = state.assets_base.join("css");
     if let Some(file_path) = safe_join(&css_dir, &file) {
         if file_path.exists() {
-            return serve_local_file(&file_path).await;
+            return serve_local_file(&file_path, versioned).await;
         }
     }
 
@@ -813,28 +833,37 @@ async fn css_handler(
     let theme_name = file.trim_end_matches(".css");
     if let Some(theme) = crate::themes::find_theme(theme_name) {
         let css = crate::themes::render_theme_css(theme);
-        return serve_css(&css);
+        return serve_css(&css, false);
     }
 
     // 4. Try bundled CSS (legacy)
     let bundled = crate::template::bundled_css(&file);
     if !bundled.is_empty() {
-        return serve_css(bundled);
+        return serve_css(bundled, false);
     }
 
     (StatusCode::NOT_FOUND, "CSS not found").into_response()
 }
 
-fn serve_css(css: &str) -> Response {
+fn cache_header(versioned: bool) -> &'static str {
+    if versioned {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
+    }
+}
+
+fn serve_css(css: &str, versioned: bool) -> Response {
     let headers = {
         let mut h = HeaderMap::new();
         h.insert("Content-Type", "text/css; charset=utf-8".parse().unwrap());
+        h.insert("Cache-Control", cache_header(versioned).parse().unwrap());
         h
     };
     (headers, css.to_owned()).into_response()
 }
 
-async fn serve_local_file(file_path: &Path) -> Response {
+async fn serve_local_file(file_path: &Path, versioned: bool) -> Response {
     let mime = mime_guess::from_path(file_path).first_or_octet_stream();
     match tokio::fs::read(file_path).await {
         Ok(data) => {
@@ -844,6 +873,7 @@ async fn serve_local_file(file_path: &Path) -> Response {
                     "Content-Type",
                     mime.to_string().parse().unwrap(),
                 );
+                h.insert("Cache-Control", cache_header(versioned).parse().unwrap());
                 h
             };
             (headers, data).into_response()
