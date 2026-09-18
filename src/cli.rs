@@ -23,9 +23,6 @@ pub struct Cli {
 
     #[arg(long, global = true, help = "CSS theme or path to custom CSS")]
     pub css_support: Option<String>,
-
-    #[arg(long, global = true, help = "Enable Obsidian wikilinks/embeds")]
-    pub obsidian: bool,
 }
 
 #[derive(Subcommand)]

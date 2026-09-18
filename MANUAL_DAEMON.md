@@ -15,7 +15,7 @@ enginemd daemon restart    # stop + start
 Los flags globales del servidor se reenvían al proceso en segundo plano:
 
 ```bash
-enginemd --port 8080 --obsidian daemon start
+enginemd --port 8080 daemon start
 enginemd daemon start --port 8080 --path /ruta   # también válido (flags globales)
 ```
 

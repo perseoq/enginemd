@@ -5,15 +5,19 @@ EngineMD puede renderizar bóvedas de Obsidian respetando sus enlaces internos
 
 ## Activación
 
-El modo Obsidian se activa de forma automática cuando el sitio contiene una
-carpeta `.obsidian/` en su raíz. También puedes forzarlo:
+La detección es **automática y por defecto**, sin flags ni configuración. Un
+sitio se trata como bóveda Obsidian cuando:
 
-```bash
-enginemd --obsidian            # servidor en modo Obsidian
-enginemd --path /ruta --obsidian
-```
+1. contiene una carpeta `.obsidian/` en su raíz, **o**
+2. su contenido usa sintaxis Obsidian: algún `.md` incluye `[[...]]` o
+   `![[...]]`.
 
-O por configuración, global o por sitio, en `~/.enginemd/settings.json`:
+La detección se cachea por sitio y se recalcula en modo `--watch` cuando
+cambian los archivos.
+
+Si necesitas forzar el comportamiento (por ejemplo, un sitio que usa `[[...]]`
+sin ser Obsidian, o lo contrario), puedes usar `settings.json`, global o por
+sitio:
 
 ```json
 {
