@@ -468,6 +468,7 @@ dependencies = [
  "mime_guess",
  "notify",
  "notify-debouncer-mini",
+ "percent-encoding",
  "regex",
  "reqwest",
  "serde",

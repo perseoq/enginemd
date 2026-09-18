@@ -29,6 +29,8 @@ impl TemplateEngine {
         current_page: usize,
         total_pages: usize,
         total: usize,
+        page_start: usize,
+        page_end: usize,
     ) -> String {
         let mut ctx = Context::new();
         ctx.insert("lang", lang);
@@ -37,6 +39,8 @@ impl TemplateEngine {
         ctx.insert("current_page", &current_page);
         ctx.insert("total_pages", &total_pages);
         ctx.insert("total", &total);
+        ctx.insert("page_start", &page_start);
+        ctx.insert("page_end", &page_end);
 
         self.tera.render("listing", &ctx).unwrap_or_else(|e| {
             format!("<h1>Template error</h1><p>{e}</p>")

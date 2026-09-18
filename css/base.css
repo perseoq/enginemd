@@ -59,3 +59,29 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 .error-page .home-link { color: var(--link); text-decoration: none; }
 
 .listing-footer { text-align: center; padding: 2rem 1.5rem; color: var(--footer-text); font-size: 0.8rem; border-top: 1px solid var(--footer-border); margin-top: 2rem; }
+
+/* Syntax highlighting (syntect ClassStyle::Spaced) */
+.markdown-body pre code .comment { color: #6a737d; font-style: italic; }
+.markdown-body pre code .keyword { color: #d73a49; }
+.markdown-body pre code .storage { color: #d73a49; }
+.markdown-body pre code .string { color: #032f62; }
+.markdown-body pre code .constant { color: #005cc5; }
+.markdown-body pre code .entity { color: #6f42c1; }
+.markdown-body pre code .support { color: #005cc5; }
+.markdown-body pre code .variable { color: #e36209; }
+.markdown-body pre code .meta { color: #6a737d; }
+.markdown-body pre code .invalid { color: #b31d28; background: #ffeef0; }
+.markdown-body pre code .markup { color: #22863a; }
+
+/* Obsidian wikilinks & embeds */
+.markdown-body a.wikilink { color: var(--link); text-decoration: none; border-bottom: 1px solid transparent; }
+.markdown-body a.wikilink:hover { border-bottom-color: var(--link); }
+.markdown-body a.wikilink-new { color: var(--topbar-desc); border-bottom: 1px dashed var(--topbar-desc); }
+.markdown-body .embed { display: block; margin: 1rem 0; }
+.markdown-body .embed-image { text-align: center; }
+.markdown-body .embed-image img { max-width: 100%; height: auto; border-radius: 6px; }
+.markdown-body .embed-note { border-left: 3px solid var(--blockquote-border); background: var(--blockquote-bg, transparent); padding: 0.5rem 1rem; border-radius: 0 6px 6px 0; }
+.markdown-body .embed-missing { color: var(--topbar-desc); font-style: italic; }
+.markdown-body .block-ref { display: block; height: 0; }
+
+

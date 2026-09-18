@@ -43,6 +43,7 @@ enginemd --port 8080                # Puerto personalizado
 enginemd --js-support mathjax,mermaid,chartjs  # Librerías JS
 enginemd --css-support dark         # Tema CSS
 enginemd --lang es                  # Idioma
+enginemd --obsidian                 # Modo Obsidian (wikilinks/embeds)
 ```
 
 ## Páginas
@@ -86,6 +87,16 @@ EngineMD soporta dos formas de crear gráficos:
 
 Ver `MANUAL_CHARTJS.md` para más ejemplos.
 
+## Soporte Obsidian
+
+EngineMD renderiza bóvedas de Obsidian: wikilinks `[[Nota]]`, enlaces a
+encabezados `[[Nota#Sección]]`, enlaces a bloques `[[Nota#^id]]`, e
+incrustaciones `![[imagen.png|640x480]]` y `![[Nota]]`. La resolución es por
+nombre en todo el sitio, como en Obsidian.
+
+Se activa automáticamente si el sitio contiene una carpeta `.obsidian/`, o con
+`--obsidian`. Ver `MANUAL_OBSIDIAN.md`.
+
 ## Temas CSS
 
 | Tema | Descripción |
@@ -119,7 +130,7 @@ Se configuran por sitio en `~/.enginemd/settings.json`:
     "mathjax": "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js",
     "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js",
     "chartjs": "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js",
-    "highlight": "https://cdn.jsdelivr.net/npm/highlight.js@11/lib/index.js",
+    "highlight": "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js",
     "katex": "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js",
     "fontawesome": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css",
     "anchor": "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js"
