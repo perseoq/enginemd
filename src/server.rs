@@ -9,8 +9,7 @@ use axum::{
     routing::get,
 };
 use futures_util::{SinkExt, StreamExt};
-use notify::RecursiveMode;
-use notify_debouncer_mini::new_debouncer;
+use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
@@ -113,42 +112,69 @@ fn start_file_watcher(
     reload_tx: broadcast::Sender<String>,
     vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
 ) -> Result<(), String> {
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (event_tx, event_rx) = std::sync::mpsc::channel::<()>();
 
-    let mut debouncer = new_debouncer(
-        std::time::Duration::from_millis(300),
-        tx,
-    )
-    .map_err(|e| format!("debouncer: {e}"))?;
+    let mut watcher = recommended_watcher(move |res: notify::Result<Event>| {
+        let event = match res {
+            Ok(event) => event,
+            Err(e) => {
+                warn!("Watch error: {e}");
+                return;
+            }
+        };
+
+        // Ignore read/open events: the server itself opens files on every
+        // request, which would otherwise trigger an endless reload loop.
+        if matches!(event.kind, EventKind::Access(_)) {
+            return;
+        }
+
+        // Ignore bookkeeping directories such as .git/ and .obsidian/.
+        if event.paths.iter().all(|p| is_ignored_path(p)) {
+            return;
+        }
+
+        let _ = event_tx.send(());
+    })
+    .map_err(|e| format!("watcher: {e}"))?;
 
     for p in &paths {
-        debouncer
-            .watcher()
+        watcher
             .watch(Path::new(p), RecursiveMode::Recursive)
             .map_err(|e| format!("cannot watch {p}: {e}"))?;
     }
 
     std::thread::spawn(move || {
-        // Keep the debouncer (and its watcher) alive for the lifetime of this thread.
-        let _debouncer = debouncer;
-        while let Ok(result) = rx.recv() {
-            match result {
-                Ok(events) => {
-                    if !events.is_empty() {
-                        if let Ok(mut v) = vaults.write() {
-                            v.clear();
-                        }
-                        let _ = reload_tx.send("reload".to_string());
-                    }
-                }
-                Err(e) => {
-                    warn!("Debouncer error: {e}");
+        // Keep the watcher (and its watches) alive for the lifetime of this thread.
+        let _watcher = watcher;
+
+        while event_rx.recv().is_ok() {
+            // Trailing debounce: wait for a quiet period before reloading.
+            loop {
+                match event_rx.recv_timeout(std::time::Duration::from_millis(300)) {
+                    Ok(()) => continue,
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
                 }
             }
+
+            if let Ok(mut v) = vaults.write() {
+                v.clear();
+            }
+            let _ = reload_tx.send("reload".to_string());
         }
     });
 
     Ok(())
+}
+
+fn is_ignored_path(path: &Path) -> bool {
+    path.components().any(|c| {
+        matches!(
+            c,
+            std::path::Component::Normal(name) if name == ".git" || name == ".obsidian"
+        )
+    })
 }
 
 async fn ws_handler(
@@ -159,16 +185,29 @@ async fn ws_handler(
 }
 
 async fn handle_ws(socket: ws::WebSocket, reload_tx: broadcast::Sender<String>) {
-    let (mut sender, _receiver) = socket.split();
+    let (mut sender, mut receiver) = socket.split();
     let mut rx = reload_tx.subscribe();
 
-    while let Ok(msg) = rx.recv().await {
-        if sender
-            .send(ws::Message::Text(msg.into()))
-            .await
-            .is_err()
-        {
-            break;
+    loop {
+        tokio::select! {
+            msg = rx.recv() => match msg {
+                Ok(msg) => {
+                    if sender
+                        .send(ws::Message::Text(msg.into()))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            },
+            incoming = receiver.next() => match incoming {
+                Some(Ok(ws::Message::Close(_))) | None => break,
+                Some(Ok(_)) => {}
+                Some(Err(_)) => break,
+            },
         }
     }
 }
@@ -417,25 +456,28 @@ async fn serve_internal(
         return (StatusCode::NOT_FOUND, Html(html)).into_response();
     }
 
-    if let Some(md_path) = safe_join(base, &format!("{path}.md")) {
+    let render_path = strip_md_ext(path);
+    let is_markdown_request = render_path.len() != path.len();
+
+    if let Some(md_path) = safe_join(base, &format!("{render_path}.md")) {
         if md_path.exists() {
-            let base_url = page_base_url(path, false);
+            let base_url = page_base_url(render_path, false);
             return render_file(state, site_path, &md_path, config, base_url.as_deref()).await;
         }
     }
 
-    if let Some(dir) = safe_join(base, path) {
+    if let Some(dir) = safe_join(base, render_path) {
         if dir.is_dir() {
             for name in &["index.md", "init.md"] {
                 let file = dir.join(name);
                 if file.exists() {
-                    let base_url = page_base_url(path, true);
+                    let base_url = page_base_url(render_path, true);
                     return render_file(state, site_path, &file, config, base_url.as_deref()).await;
                 }
             }
         }
 
-        if dir.is_file() {
+        if !is_markdown_request && dir.is_file() {
             return serve_static_file(&dir).await;
         }
     }
@@ -455,9 +497,19 @@ fn page_base_url(path: &str, is_dir: bool) -> Option<String> {
     if is_dir {
         return Some(format!("{}/", path.trim_end_matches('/')));
     }
-    match path.rsplit_once('/') {
-        Some((dir, _)) if !dir.is_empty() => Some(format!("{dir}/")),
-        _ => None,
+    // File pages already resolve relative links against their own directory,
+    // so no <base> is needed (and a relative one would be wrong).
+    None
+}
+
+fn strip_md_ext(path: &str) -> &str {
+    let lower = path.to_ascii_lowercase();
+    if lower.ends_with(".markdown") {
+        &path[..path.len() - ".markdown".len()]
+    } else if lower.ends_with(".md") {
+        &path[..path.len() - ".md".len()]
+    } else {
+        path
     }
 }
 
@@ -761,5 +813,42 @@ async fn serve_local_file(file_path: &Path) -> Response {
             (headers, data).into_response()
         }
         Err(_) => (StatusCode::NOT_FOUND, "File not found").into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ignored_paths() {
+        assert!(is_ignored_path(Path::new("/site/.git/index")));
+        assert!(is_ignored_path(Path::new("/site/.obsidian/workspace.json")));
+        assert!(is_ignored_path(Path::new("a/.git/b/c.md")));
+        assert!(!is_ignored_path(Path::new("/site/docs/guide.md")));
+        assert!(!is_ignored_path(Path::new("/site/.hidden.md")));
+    }
+
+    #[test]
+    fn safe_join_rejects_traversal() {
+        let base = Path::new("/tmp");
+        assert!(safe_join(base, "../etc/passwd").is_none());
+        assert!(safe_join(base, "/etc/passwd").is_none());
+        assert_eq!(safe_join(base, "docs/a.md"), Some(Path::new("/tmp/docs/a.md").to_path_buf()));
+    }
+
+    #[test]
+    fn strips_markdown_extension() {
+        assert_eq!(strip_md_ext("docs/guia.md"), "docs/guia");
+        assert_eq!(strip_md_ext("docs/guia.MD"), "docs/guia");
+        assert_eq!(strip_md_ext("docs/guia.markdown"), "docs/guia");
+        assert_eq!(strip_md_ext("docs/guia"), "docs/guia");
+        assert_eq!(strip_md_ext("docs/a.md.txt"), "docs/a.md.txt");
+    }
+
+    #[test]
+    fn base_url_only_for_directories() {
+        assert_eq!(page_base_url("docs", true), Some("docs/".to_string()));
+        assert_eq!(page_base_url("docs/guia", false), None);
     }
 }

@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod daemon;
 mod obsidian;
 mod project;
 mod registry;
@@ -27,27 +28,33 @@ async fn main() {
         std::process::exit(1);
     }
 
-    match cli.command {
+    match &cli.command {
         Some(Commands::New { name, css, js_support }) => {
-            if let Err(e) = project::cmd_new(&name, css.as_deref(), js_support.as_deref()) {
+            if let Err(e) = project::cmd_new(name, css.as_deref(), js_support.as_deref()) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
         }
         Some(Commands::Up { path, css, js_support }) => {
-            if let Err(e) = project::cmd_up(&path, css.as_deref(), js_support.as_deref()) {
+            if let Err(e) = project::cmd_up(path, css.as_deref(), js_support.as_deref()) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
         }
         Some(Commands::Down { name }) => {
-            if let Err(e) = project::cmd_down(&name) {
+            if let Err(e) = project::cmd_down(name) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
         }
         Some(Commands::Fetch) => {
             if let Err(e) = registry::cmd_fetch().await {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::Daemon { action }) => {
+            if let Err(e) = daemon::handle(action, &cli) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
@@ -64,11 +71,11 @@ async fn main() {
             if let Err(e) = server::start_server(
                 settings,
                 cli.watch,
-                cli.path,
+                cli.path.clone(),
                 cli.port,
-                cli.lang,
+                cli.lang.clone(),
                 js_override,
-                cli.css_support,
+                cli.css_support.clone(),
                 cli.obsidian.then_some(true),
             )
             .await

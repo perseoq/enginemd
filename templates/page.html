@@ -33,11 +33,15 @@
   {% if watch_mode %}
   <script>
     (function() {
-      var ws = new WebSocket('ws://' + location.host + '/__enginemd/ws');
-      ws.onmessage = function(e) {
-        if (e.data === 'reload') { location.reload(); }
-      };
-      ws.onclose = function() { setTimeout(arguments.callee, 3000); };
+      function connect() {
+        var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+        var ws = new WebSocket(proto + location.host + '/__enginemd/ws');
+        ws.onmessage = function(e) {
+          if (e.data === 'reload') { location.reload(); }
+        };
+        ws.onclose = function() { setTimeout(connect, 2000); };
+      }
+      connect();
     })();
   </script>
   {% endif %}
