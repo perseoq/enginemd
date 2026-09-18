@@ -35,6 +35,7 @@ pub fn cmd_new(name: &str, css: Option<&str>, js_support: Option<&str>) -> Resul
         css: css.map(|s| s.to_string()),
         js_support: js_vec,
         lang: None,
+        obsidian: None,
     });
     config::save_settings(&settings)?;
 
@@ -75,6 +76,7 @@ pub fn cmd_up(path: &str, css: Option<&str>, js_support: Option<&str>) -> Result
         css: css.map(|s| s.to_string()),
         js_support: js_vec,
         lang: None,
+        obsidian: None,
     });
     config::save_settings(&settings)?;
 

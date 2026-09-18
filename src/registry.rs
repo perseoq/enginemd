@@ -11,15 +11,16 @@ pub async fn cmd_fetch() -> Result<(), String> {
         .map_err(|e| format!("cannot create css dir: {e}"))?;
 
     for (name, value) in &settings.dependencies {
-        let (url, local_rel) = resolve_fetch_path(value);
-        let target = js_dir.join(&local_rel);
-
-        if target.exists() {
-            println!("  [skip] {name} (already cached)");
+        let url = resolve_url(value);
+        if url.is_empty() {
             continue;
         }
 
-        if url.is_empty() {
+        let local_name = crate::config::dep_local_name(name, value);
+        let target = js_dir.join(&local_name);
+
+        if target.exists() {
+            println!("  [skip] {name} (already cached)");
             continue;
         }
 
@@ -36,7 +37,6 @@ pub async fn cmd_fetch() -> Result<(), String> {
             println!("  [skip] style '{name}' (already cached)");
             continue;
         }
-        println!("  [fetch] style '{name}'...");
 
         let bundled = crate::template::bundled_css(file);
         if !bundled.is_empty() {
@@ -48,10 +48,17 @@ pub async fn cmd_fetch() -> Result<(), String> {
             continue;
         }
 
-        let (url, _) = resolve_fetch_path(file);
+        // Generated at request time from themes.rs; nothing to download.
+        if crate::themes::find_theme(name).is_some() {
+            println!("  [skip] style '{name}' (generated at runtime)");
+            continue;
+        }
+
+        let url = resolve_url(file);
         if url.is_empty() {
             continue;
         }
+        println!("  [fetch] style '{name}'...");
         match download_to(&url, &target).await {
             Ok(_) => println!("  [done]  {name}"),
             Err(e) => eprintln!("  [warn]  {name}: {e}"),
@@ -62,17 +69,11 @@ pub async fn cmd_fetch() -> Result<(), String> {
     Ok(())
 }
 
-fn resolve_fetch_path(value: &str) -> (String, String) {
+fn resolve_url(value: &str) -> String {
     if value.starts_with("http://") || value.starts_with("https://") {
-        let local = value
-            .split("://")
-            .nth(1)
-            .and_then(|s| s.split('/').skip(1).collect::<Vec<_>>().join("/").into())
-            .unwrap_or_else(|| value.to_string());
-        (value.to_string(), local)
+        value.to_string()
     } else {
-        let url = format!("https://cdn.jsdelivr.net/npm/{}", value);
-        (url, value.to_string())
+        format!("https://cdn.jsdelivr.net/npm/{}", value)
     }
 }
 

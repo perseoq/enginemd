@@ -16,7 +16,8 @@ use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
 
 use crate::config::{self, DirectoryEntry, Settings};
-use crate::renderer::{self, render_markdown, Frontmatter};
+use crate::obsidian::VaultIndex;
+use crate::renderer::{self, render_markdown, Frontmatter, RenderContext};
 use crate::template::{ListingEntry, TemplateEngine};
 
 #[derive(Clone)]
@@ -30,6 +31,8 @@ pub struct AppState {
     pub override_lang: Option<String>,
     pub override_js: Option<Vec<String>>,
     pub override_css: Option<String>,
+    pub override_obsidian: Option<bool>,
+    pub vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
 }
 
 pub async fn start_server(
@@ -40,6 +43,7 @@ pub async fn start_server(
     override_lang: Option<String>,
     override_js: Option<Vec<String>>,
     override_css: Option<String>,
+    override_obsidian: Option<bool>,
 ) -> Result<(), String> {
     let (reload_tx, _) = broadcast::channel::<String>(100);
     let templates = Arc::new(TemplateEngine::new(watch_mode));
@@ -53,6 +57,8 @@ pub async fn start_server(
         override_lang,
         override_js,
         override_css,
+        override_obsidian,
+        vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
     };
 
     let app = Router::new()
@@ -87,8 +93,9 @@ pub async fn start_server(
                 .collect()
         };
         let tx = reload_tx.clone();
+        let vaults = state.vaults.clone();
         tokio::spawn(async move {
-            if let Err(e) = start_file_watcher(dirs, tx) {
+            if let Err(e) = start_file_watcher(dirs, tx, vaults) {
                 eprintln!("File watcher error: {e}");
             }
         });
@@ -104,6 +111,7 @@ pub async fn start_server(
 fn start_file_watcher(
     paths: Vec<String>,
     reload_tx: broadcast::Sender<String>,
+    vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
 ) -> Result<(), String> {
     let (tx, rx) = std::sync::mpsc::channel();
 
@@ -121,12 +129,16 @@ fn start_file_watcher(
     }
 
     std::thread::spawn(move || {
+        // Keep the debouncer (and its watcher) alive for the lifetime of this thread.
+        let _debouncer = debouncer;
         while let Ok(result) = rx.recv() {
             match result {
                 Ok(events) => {
-                    for _event in &events {
+                    if !events.is_empty() {
+                        if let Ok(mut v) = vaults.write() {
+                            v.clear();
+                        }
                         let _ = reload_tx.send("reload".to_string());
-                        break;
                     }
                 }
                 Err(e) => {
@@ -195,6 +207,10 @@ async fn listing_handler(
     let total_pages = total.max(1).div_ceil(per_page);
     let current_page = page.min(total_pages.max(1));
 
+    let mut page_start = current_page.saturating_sub(2).max(1);
+    let page_end = (page_start + 4).min(total_pages);
+    page_start = page_end.saturating_sub(4).max(1);
+
     let start = (current_page - 1) * per_page;
     let slice: Vec<&DirectoryEntry> = active.iter()
         .skip(start)
@@ -227,6 +243,8 @@ async fn listing_handler(
         current_page,
         total_pages.max(1),
         total,
+        page_start,
+        page_end,
     );
 
     Html(html).into_response()
@@ -273,6 +291,12 @@ async fn serve_single_site(
         js_support: state.override_js.as_ref(),
         lang: state.override_lang.as_deref().unwrap_or(&state.settings.lang),
         site_title: &site_name,
+        url_prefix: "/".to_string(),
+        obsidian: obsidian_enabled(
+            state.override_obsidian,
+            state.settings.obsidian,
+            site_path,
+        ),
     };
     serve_internal(state, site_path, sub_path, &config).await
 }
@@ -324,6 +348,12 @@ async fn serve_path_with_config(
         js_support,
         lang,
         site_title: &entry.name,
+        url_prefix: format!("/{}/", entry.name),
+        obsidian: obsidian_enabled(
+            state.override_obsidian.or(entry.obsidian),
+            state.settings.obsidian,
+            site_path,
+        ),
     };
 
     serve_internal(state, site_path, path, &config).await
@@ -334,6 +364,31 @@ struct PageConfig<'a> {
     js_support: Option<&'a Vec<String>>,
     lang: &'a str,
     site_title: &'a str,
+    url_prefix: String,
+    obsidian: bool,
+}
+
+fn obsidian_enabled(explicit: Option<bool>, global: bool, site_path: &str) -> bool {
+    if let Some(v) = explicit {
+        return v;
+    }
+    if global {
+        return true;
+    }
+    Path::new(site_path).join(".obsidian").is_dir()
+}
+
+fn get_vault(state: &AppState, site_path: &str) -> Arc<VaultIndex> {
+    if let Some(v) = state.vaults.read().unwrap().get(site_path) {
+        return v.clone();
+    }
+    let index = Arc::new(VaultIndex::build(Path::new(site_path)));
+    state
+        .vaults
+        .write()
+        .unwrap()
+        .insert(site_path.to_string(), index.clone());
+    index
 }
 
 async fn serve_internal(
@@ -348,7 +403,7 @@ async fn serve_internal(
         for name in &["index.md", "init.md"] {
             let file = base.join(name);
             if file.exists() {
-                return render_file(state, &file, config, None).await;
+                return render_file(state, site_path, &file, config, None).await;
             }
         }
         let css_file = state.settings.styles.get(config.css).cloned()
@@ -362,24 +417,27 @@ async fn serve_internal(
         return (StatusCode::NOT_FOUND, Html(html)).into_response();
     }
 
-    let md_path = base.join(format!("{}.md", path));
-    if md_path.exists() {
-        return render_file(state, &md_path, config, Some(path)).await;
-    }
-
-    let dir = base.join(path);
-    if dir.is_dir() {
-        for name in &["index.md", "init.md"] {
-            let file = dir.join(name);
-            if file.exists() {
-                return render_file(state, &file, config, Some(path)).await;
-            }
+    if let Some(md_path) = safe_join(base, &format!("{path}.md")) {
+        if md_path.exists() {
+            let base_url = page_base_url(path, false);
+            return render_file(state, site_path, &md_path, config, base_url.as_deref()).await;
         }
     }
 
-    let static_file = base.join(path);
-    if static_file.exists() && static_file.is_file() {
-        return serve_static_file(&static_file).await;
+    if let Some(dir) = safe_join(base, path) {
+        if dir.is_dir() {
+            for name in &["index.md", "init.md"] {
+                let file = dir.join(name);
+                if file.exists() {
+                    let base_url = page_base_url(path, true);
+                    return render_file(state, site_path, &file, config, base_url.as_deref()).await;
+                }
+            }
+        }
+
+        if dir.is_file() {
+            return serve_static_file(&dir).await;
+        }
     }
 
     let css_file = state.settings.styles.get(config.css).cloned()
@@ -393,11 +451,43 @@ async fn serve_internal(
     (StatusCode::NOT_FOUND, Html(html)).into_response()
 }
 
+fn page_base_url(path: &str, is_dir: bool) -> Option<String> {
+    if is_dir {
+        return Some(format!("{}/", path.trim_end_matches('/')));
+    }
+    match path.rsplit_once('/') {
+        Some((dir, _)) if !dir.is_empty() => Some(format!("{dir}/")),
+        _ => None,
+    }
+}
+
+fn safe_join(base: &Path, rel: &str) -> Option<std::path::PathBuf> {
+    use std::path::Component;
+
+    let mut clean = std::path::PathBuf::new();
+    for comp in Path::new(rel).components() {
+        match comp {
+            Component::Normal(c) => clean.push(c),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    let joined = base.join(&clean);
+    if let (Ok(base_canon), Ok(joined_canon)) = (base.canonicalize(), joined.canonicalize()) {
+        if !joined_canon.starts_with(&base_canon) {
+            return None;
+        }
+    }
+    Some(joined)
+}
+
 async fn render_file(
     state: &AppState,
+    site_path: &str,
     file_path: &Path,
     config: &PageConfig<'_>,
-    base_path: Option<&str>,
+    base_url: Option<&str>,
 ) -> Response {
     let content = match std::fs::read_to_string(file_path) {
         Ok(c) => c,
@@ -414,8 +504,27 @@ async fn render_file(
         }
     };
 
+    let current_rel = file_path
+        .strip_prefix(site_path)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_default();
+
+    let vault = if config.obsidian {
+        Some(get_vault(state, site_path))
+    } else {
+        None
+    };
+
+    let render_ctx = vault.as_ref().map(|index| RenderContext {
+        site_root: Path::new(site_path),
+        url_prefix: &config.url_prefix,
+        current_rel: &current_rel,
+        index: index.as_ref(),
+        obsidian: true,
+    });
+
     let mut fm = Frontmatter::default();
-    let html_body = render_markdown(&content, &mut fm);
+    let html_body = render_markdown(&content, &mut fm, render_ctx.as_ref());
 
     let title = fm.title.as_deref().map(|s| s.to_string())
         .or_else(|| renderer::extract_first_heading(&content));
@@ -423,11 +532,7 @@ async fn render_file(
     let description = fm.description.as_deref();
     let page_lang = fm.lang.as_deref().unwrap_or(config.lang);
 
-    let base_url = base_path.map(|p| {
-        if p.ends_with('/') { p.to_string() } else { format!("{p}/") }
-    });
-
-    let js_assets = resolve_js(&state.settings.dependencies, config.js_support);
+    let js_assets = resolve_js(&state.settings.dependencies, config.js_support, config.css);
 
     let css_file = state.settings.styles
         .get(config.css)
@@ -441,7 +546,7 @@ async fn render_file(
         config.site_title,
         page_lang,
         &css_file,
-        base_url.as_deref(),
+        base_url,
         &js_assets.extra_css,
         &js_assets.head_scripts,
         &js_assets.head_inline,
@@ -462,6 +567,7 @@ struct JsAssets {
 fn resolve_js(
     dep_map: &std::collections::HashMap<String, String>,
     js_support: Option<&Vec<String>>,
+    css_theme: &str,
 ) -> JsAssets {
     let mut assets = JsAssets {
         head_scripts: Vec::new(),
@@ -475,7 +581,7 @@ fn resolve_js(
         .unwrap_or_default();
 
     for key in &js_keys {
-        let url = cdn_or_local(key, &dep_map);
+        let url = cdn_or_local(key, dep_map);
 
         match key.as_str() {
             "mermaid" => {
@@ -485,6 +591,10 @@ fn resolve_js(
                 assets.body_scripts.push(url);
             }
             "highlight" => {
+                let hl_theme = if css_theme.contains("dark") { "github-dark" } else { "github" };
+                assets.extra_css.push(format!(
+                    "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/styles/{hl_theme}.min.css"
+                ));
                 assets.head_inline.push(
                     "<script>document.addEventListener('DOMContentLoaded',function(){typeof hljs!=='undefined'&&hljs.highlightAll();});</script>".to_string()
                 );
@@ -498,7 +608,11 @@ fn resolve_js(
             }
             "katex" => {
                 assets.extra_css.push("https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css".to_string());
-                assets.body_scripts.push(url);
+                assets.head_scripts.push(url);
+                assets.head_scripts.push("https://cdn.jsdelivr.net/npm/katex@0.16/dist/contrib/auto-render.min.js".to_string());
+                assets.head_inline.push(
+                    "<script>document.addEventListener('DOMContentLoaded',function(){typeof renderMathInElement!=='undefined'&&renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\\\[',right:'\\\\]',display:true},{left:'$',right:'$',display:false},{left:'\\\\(',right:'\\\\)',display:false}]});});</script>".to_string()
+                );
             }
             "anchor" => {
                 assets.head_inline.push(
@@ -530,27 +644,34 @@ fn cdn_or_local(key: &str, dep_map: &std::collections::HashMap<String, String>) 
         ("mathjax", "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"),
         ("mermaid", "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"),
         ("chartjs", "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"),
-        ("highlight", "https://cdn.jsdelivr.net/npm/highlight.js@11/lib/index.js"),
+        ("highlight", "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js"),
         ("katex", "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"),
         ("katex_css", "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css"),
         ("fontawesome", "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css"),
         ("anchor", "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js"),
     ];
 
-    // First check if it's a known library — use CDN
+    let value = dep_map.get(key);
+
+    // Prefer a locally fetched copy when one exists.
+    if let Some(v) = value {
+        let local = config::dep_local_name(key, v);
+        if config::js_dir().join(&local).exists() {
+            return format!("/__enginemd/js/{local}");
+        }
+    }
+
+    // Known library -> canonical CDN URL.
     if let Some((_, cdn)) = KNOWN_CDN.iter().find(|(k, _)| *k == key) {
         return cdn.to_string();
     }
 
-    // Otherwise use the value from settings
-    if let Some(value) = dep_map.get(key) {
-        if value.starts_with("http://") || value.starts_with("https://") {
-            return value.clone();
-        }
-        return format!("/__enginemd/js/{}", value);
+    // Otherwise use the value from settings.
+    match value {
+        Some(v) if v.starts_with("http://") || v.starts_with("https://") => v.clone(),
+        Some(v) => format!("/__enginemd/js/{}", config::dep_local_name(key, v)),
+        None => format!("/__enginemd/js/{key}.js"),
     }
-
-    format!("/__enginemd/js/{}.js", key)
 }
 
 async fn serve_static_file(path: &Path) -> Response {
@@ -576,8 +697,10 @@ async fn js_handler(
     AxumPath(file): AxumPath<String>,
 ) -> Response {
     let js_dir = config::js_dir();
-    let file_path = js_dir.join(&file);
-    serve_local_file(&file_path).await
+    match safe_join(&js_dir, &file) {
+        Some(file_path) => serve_local_file(&file_path).await,
+        None => (StatusCode::BAD_REQUEST, "Invalid path").into_response(),
+    }
 }
 
 async fn css_handler(
@@ -592,9 +715,10 @@ async fn css_handler(
 
     // 2. Try file from ~/.enginemd/css/ (user custom themes)
     let css_dir = config::css_dir();
-    let file_path = css_dir.join(&file);
-    if file_path.exists() {
-        return serve_local_file(&file_path).await;
+    if let Some(file_path) = safe_join(&css_dir, &file) {
+        if file_path.exists() {
+            return serve_local_file(&file_path).await;
+        }
     }
 
     // 3. Try generated theme from themes.rs

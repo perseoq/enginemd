@@ -45,9 +45,8 @@
         <span class="page-link disabled">&laquo; Previous</span>
         {% endif %}
 
-        {% set start = [current_page - 2, 1] | max %}
-        {% set end = [start + 4, total_pages] | min %}
-        {% set start = [end - 4, 1] | max %}
+        {% set start = page_start %}
+        {% set end = page_end %}
 
         {% if start > 1 %}
         <a href="/?page=1" class="page-link">1</a>

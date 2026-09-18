@@ -23,3 +23,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
 mime_guess = "2"
 regex = "1"
+percent-encoding = "2"

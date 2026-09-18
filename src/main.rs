@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod obsidian;
 mod project;
 mod registry;
 mod renderer;
@@ -68,6 +69,7 @@ async fn main() {
                 cli.lang,
                 js_override,
                 cli.css_support,
+                cli.obsidian.then_some(true),
             )
             .await
             {

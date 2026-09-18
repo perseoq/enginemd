@@ -1,9 +1,13 @@
 use comrak::{markdown_to_html, ComrakOptions};
 use regex::Regex;
 use serde::Deserialize;
+use std::collections::HashSet;
+use std::path::Path;
 use syntect::highlighting::ThemeSet;
 use syntect::html::{ClassStyle, ClassedHTMLGenerator};
 use syntect::parsing::SyntaxSet;
+
+use crate::obsidian::{self, EmbedContext, VaultIndex};
 
 #[derive(Debug, Default, Deserialize, Clone)]
 pub struct Frontmatter {
@@ -24,9 +28,18 @@ pub fn extract_frontmatter(input: &str, fm: &mut Frontmatter) {
     }
 }
 
+pub struct RenderContext<'a> {
+    pub site_root: &'a Path,
+    pub url_prefix: &'a str,
+    pub current_rel: &'a str,
+    pub index: &'a VaultIndex,
+    pub obsidian: bool,
+}
+
 pub fn render_markdown(
     input: &str,
     frontmatter: &mut Frontmatter,
+    ctx: Option<&RenderContext<'_>>,
 ) -> String {
     let (body, fm) = parse_frontmatter(input);
     if let Some(f) = fm {
@@ -35,6 +48,43 @@ pub fn render_markdown(
         if f.lang.is_some() { frontmatter.lang = f.lang; }
     }
 
+    let html = match ctx {
+        Some(c) if c.obsidian => {
+            let embed_ctx = EmbedContext {
+                root: c.site_root,
+                prefix: c.url_prefix,
+                index: c.index,
+                max_depth: 5,
+            };
+            let mut visited = HashSet::new();
+            if !c.current_rel.is_empty() {
+                visited.insert(c.current_rel.to_string());
+            }
+            render_body(body, &embed_ctx, 0, &mut visited)
+        }
+        _ => markdown_to_html(body, &comrak_options(false)),
+    };
+
+    highlight_code_blocks(&html)
+}
+
+pub fn render_body(
+    markdown: &str,
+    ctx: &EmbedContext<'_>,
+    depth: usize,
+    visited: &mut HashSet<String>,
+) -> String {
+    let html = markdown_to_html(markdown, &comrak_options(true));
+    let html = obsidian::apply_block_ids(&html);
+    let html = obsidian::resolve_embeds(&html, ctx, depth, visited);
+    obsidian::resolve_obsidian(&html, ctx, depth, visited)
+}
+
+pub fn body_without_frontmatter(input: &str) -> &str {
+    parse_frontmatter(input).0
+}
+
+fn comrak_options(obsidian: bool) -> ComrakOptions<'static> {
     let mut ext = comrak::ExtensionOptions::default();
     ext.strikethrough = true;
     ext.table = true;
@@ -42,6 +92,7 @@ pub fn render_markdown(
     ext.tasklist = true;
     ext.header_ids = Some("".to_string());
     ext.footnotes = true;
+    ext.wikilinks_title_after_pipe = obsidian;
 
     let mut parse = comrak::ParseOptions::default();
     parse.smart = true;
@@ -51,14 +102,11 @@ pub fn render_markdown(
     render.github_pre_lang = true;
     render.full_info_string = true;
 
-    let opts = ComrakOptions {
+    ComrakOptions {
         extension: ext,
         parse,
         render,
-    };
-
-    let html = markdown_to_html(&body, &opts);
-    highlight_code_blocks(&html)
+    }
 }
 
 pub fn extract_first_heading(input: &str) -> Option<String> {
@@ -109,7 +157,7 @@ fn highlight_code_blocks(html: &str) -> String {
     let ts = ThemeSet::load_defaults();
     let theme = &ts.themes["base16-ocean.light"];
     let re = Regex::new(
-        r#"<pre(?: lang="(\w+)")?><code(?: class="language-(\w+)")?>([\s\S]*?)</code></pre>"#
+        r#"<pre(?: lang="([^"]*)")?><code(?: class="language-([^"]*)")?>([\s\S]*?)</code></pre>"#
     ).unwrap();
 
     let mut result = String::with_capacity(html.len() + 4096);
@@ -178,7 +226,7 @@ fn render_chart_block(json_str: &str, idx: &mut i32) -> Option<String> {
     html.push_str(&format!(
         r#"var ctx=document.getElementById('{}');if(!ctx)return;new Chart(ctx,{});"#,
         id,
-        json_str,
+        json_str.replace("</", "<\\/"),
     ));
     html.push_str(r#"});</script>"#);
 

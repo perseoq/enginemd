@@ -20,6 +20,8 @@ pub struct Settings {
     pub styles: HashMap<String, String>,
     #[serde(default)]
     pub directories: Vec<DirectoryEntry>,
+    #[serde(default)]
+    pub obsidian: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,6 +33,8 @@ pub struct DirectoryEntry {
     pub css: Option<String>,
     pub js_support: Option<Vec<String>>,
     pub lang: Option<String>,
+    #[serde(default)]
+    pub obsidian: Option<bool>,
 }
 
 fn default_port() -> u16 { 10300 }
@@ -61,6 +65,18 @@ pub fn css_dir() -> PathBuf {
 
 pub fn sites_dir() -> PathBuf {
     enginemd_dir().join("sites")
+}
+
+pub fn dep_local_name(key: &str, value: &str) -> String {
+    let ext = value
+        .rsplit('/')
+        .next()
+        .and_then(|seg| seg.rsplit_once('.').map(|(_, e)| e))
+        .filter(|e| {
+            !e.is_empty() && e.len() <= 5 && e.chars().all(|c| c.is_ascii_alphanumeric())
+        })
+        .unwrap_or("js");
+    format!("{key}.{ext}")
 }
 
 pub fn load_settings() -> Settings {
@@ -103,7 +119,7 @@ pub fn default_settings() -> Settings {
     dependencies.insert("mathjax".to_string(), "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js".to_string());
     dependencies.insert("mermaid".to_string(), "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js".to_string());
     dependencies.insert("chartjs".to_string(), "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js".to_string());
-    dependencies.insert("highlight".to_string(), "https://cdn.jsdelivr.net/npm/highlight.js@11/lib/index.js".to_string());
+    dependencies.insert("highlight".to_string(), "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js".to_string());
     dependencies.insert("katex".to_string(), "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js".to_string());
     dependencies.insert("fontawesome".to_string(), "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css".to_string());
     dependencies.insert("anchor".to_string(), "https://cdn.jsdelivr.net/npm/anchor-js@5/anchor.min.js".to_string());
@@ -135,6 +151,7 @@ pub fn default_settings() -> Settings {
         dependencies,
         styles,
         directories: Vec::new(),
+        obsidian: false,
     }
 }
 
