@@ -32,8 +32,16 @@ bóvedas de Obsidian.
 git clone <repo>
 cd enginemd
 cargo build --release
-./target/release/enginemd fetch   # descarga las librerías JS/CSS al caché local
+
+# Copiar el ejecutable al PATH del sistema
+sudo cp target/release/enginemd /usr/local/bin/
+
+# Descargar las librerías JS/CSS al caché local
+enginemd fetch
 ```
+
+Si no quieres instalarlo en el sistema, puedes usar directamente
+`./target/release/enginemd` en lugar de `enginemd`.
 
 ## Uso rápido
 
