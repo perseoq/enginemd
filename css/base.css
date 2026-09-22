@@ -1,8 +1,88 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
+
+/* Code highlighting palette.
+   Light: Monokai Pro. Dark: Omni (Rocketseat). */
+:root {
+  --hl-bg: #2d2a2e;
+  --hl-fg: #fcfcfa;
+  --hl-border: #3b383c;
+  --hl-comment: #727072;
+  --hl-punct: #939293;
+  --hl-keyword: #ff6188;
+  --hl-control: #ff6188;
+  --hl-storage: #ff6188;
+  --hl-operator: #ff6188;
+  --hl-string: #ffd866;
+  --hl-constant: #ab9df2;
+  --hl-constant-lang: #ab9df2;
+  --hl-numeric: #ab9df2;
+  --hl-entity: #78dce8;
+  --hl-type: #78dce8;
+  --hl-function: #a9dc76;
+  --hl-macro: #ab9df2;
+  --hl-variable: #fcfcfa;
+  --hl-param: #fc9867;
+  --hl-tag: #ff6188;
+  --hl-invalid: #ff6188;
+  --hl-invalid-bg: rgba(255, 97, 136, 0.12);
+  --hl-markup: #a9dc76;
+}
+:root[data-theme="dark"] {
+  --hl-bg: #191622;
+  --hl-fg: #e1e1e6;
+  --hl-border: #44475a;
+  --hl-comment: #5a4b81;
+  --hl-punct: #e1e1e6;
+  --hl-keyword: #ff79c6;
+  --hl-control: #ff79c6;
+  --hl-storage: #ff79c6;
+  --hl-operator: #ff79c6;
+  --hl-string: #e7de79;
+  --hl-constant: #78d1e1;
+  --hl-constant-lang: #78d1e1;
+  --hl-numeric: #78d1e1;
+  --hl-entity: #988bc7;
+  --hl-type: #988bc7;
+  --hl-function: #67e480;
+  --hl-macro: #988bc7;
+  --hl-variable: #e1e1e6;
+  --hl-param: #e89e64;
+  --hl-tag: #ff79c6;
+  --hl-invalid: #e96379;
+  --hl-invalid-bg: rgba(233, 99, 121, 0.12);
+  --hl-markup: #78d1e1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --hl-bg: #191622;
+    --hl-fg: #e1e1e6;
+    --hl-border: #44475a;
+    --hl-comment: #5a4b81;
+    --hl-punct: #e1e1e6;
+    --hl-keyword: #ff79c6;
+    --hl-control: #ff79c6;
+    --hl-storage: #ff79c6;
+    --hl-operator: #ff79c6;
+    --hl-string: #e7de79;
+    --hl-constant: #78d1e1;
+    --hl-constant-lang: #78d1e1;
+    --hl-numeric: #78d1e1;
+    --hl-entity: #988bc7;
+    --hl-type: #988bc7;
+    --hl-function: #67e480;
+    --hl-macro: #988bc7;
+    --hl-variable: #e1e1e6;
+    --hl-param: #e89e64;
+    --hl-tag: #ff79c6;
+    --hl-invalid: #e96379;
+    --hl-invalid-bg: rgba(233, 99, 121, 0.12);
+    --hl-markup: #78d1e1;
+  }
+}
 body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-height: var(--line-height, 1.6); color: var(--body-text); background: var(--body-bg); }
 
-.top-bar { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.5rem; background: var(--topbar-bg); border-bottom: 1px solid var(--topbar-border); font-size: 0.9rem; }
+.top-bar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.5rem; background: var(--topbar-bg); border-bottom: 1px solid var(--topbar-border); font-size: 0.9rem; }
 .top-bar .home-link { color: var(--topbar-home); text-decoration: none; }
 .top-bar .home-link:hover { text-decoration: underline; }
 .top-bar .site-label { color: var(--topbar-label); }
@@ -22,7 +102,7 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 .markdown-body li { margin: 0.25rem 0; }
 .markdown-body hr { margin: 1.5rem 0; border: 0; border-top: 1px solid var(--heading-border); }
 .markdown-body pre { position: relative; margin: 1rem 0; padding: 1rem; background: var(--pre-bg); border: 1px solid var(--pre-border, transparent); border-radius: 6px; overflow-x: auto; font-size: calc(0.85rem + 2pt); }
-.markdown-body code { font-family: var(--font-mono); font-size: 0.85em; padding: 0.2em 0.4em; background: #2d2a2e; color: #fcfcfa; border-radius: 3px; }
+.markdown-body code { font-family: var(--font-mono); font-size: 0.85em; padding: 0.2em 0.4em; background: var(--hl-bg); color: var(--hl-fg); border-radius: 3px; }
 .markdown-body pre code { padding: 0; background: none; }
 .markdown-body table { width: 100%; margin: 1rem 0; border-collapse: collapse; }
 .markdown-body th, .markdown-body td { padding: 0.5rem 0.75rem; border: 1px solid var(--table-border); }
@@ -75,30 +155,32 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 
 .listing-footer { text-align: center; padding: 2rem 1.5rem; color: var(--footer-text); font-size: 0.8rem; border-top: 1px solid var(--footer-border); margin-top: 2rem; }
 
-/* Syntax highlighting (syntect ClassStyle::Spaced) — Monokai Pro palette.
-   Fixed on purpose: code always looks the same in light and dark themes. */
-.markdown-body pre { background: #2d2a2e; border-color: #3b383c; color: #fcfcfa; }
-.markdown-body pre code { color: #fcfcfa; }
-.markdown-body pre code .comment { color: #727072; font-style: italic; }
-.markdown-body pre code .punctuation { color: #939293; }
+/* Syntax highlighting (syntect ClassStyle::Spaced).
+   Light: Amethyst Light. Dark: Amethyst Dark. */
+.markdown-body pre { background: var(--hl-bg); border-color: var(--hl-border); color: var(--hl-fg); }
+.markdown-body pre code { color: var(--hl-fg); }
 .markdown-body pre code .meta { color: inherit; }
-.markdown-body pre code .type { color: #78dce8; }
-.markdown-body pre code .storage { color: #ff6188; }
-.markdown-body pre code .keyword { color: #ff6188; }
-.markdown-body pre code .operator { color: #ff6188; }
-.markdown-body pre code .string { color: #ffd866; }
-.markdown-body pre code .constant { color: #ab9df2; }
-.markdown-body pre code .numeric { color: #ab9df2; }
-.markdown-body pre code .entity { color: #78dce8; }
-.markdown-body pre code .support { color: #78dce8; }
-.markdown-body pre code .function { color: #a9dc76; }
-.markdown-body pre code .support.macro { color: #ab9df2; }
-.markdown-body pre code .entity.name.tag { color: #ff6188; }
-.markdown-body pre code .storage.type.function { color: #ff6188; }
-.markdown-body pre code .variable { color: #fcfcfa; }
-.markdown-body pre code .parameter { color: #fc9867; }
-.markdown-body pre code .invalid { color: #ff6188; background: rgba(255,97,136,0.12); }
-.markdown-body pre code .markup { color: #a9dc76; }
+.markdown-body pre code .punctuation { color: var(--hl-punct); }
+.markdown-body pre code .type { color: var(--hl-type); }
+.markdown-body pre code .entity { color: var(--hl-entity); }
+.markdown-body pre code .support { color: var(--hl-entity); }
+.markdown-body pre code .comment { color: var(--hl-comment); font-style: italic; }
+.markdown-body pre code .function { color: var(--hl-function); }
+.markdown-body pre code .storage { color: var(--hl-storage); }
+.markdown-body pre code .keyword { color: var(--hl-keyword); }
+.markdown-body pre code .keyword.control { color: var(--hl-control); }
+.markdown-body pre code .operator { color: var(--hl-operator); }
+.markdown-body pre code .string { color: var(--hl-string); }
+.markdown-body pre code .constant { color: var(--hl-constant); }
+.markdown-body pre code .constant.language { color: var(--hl-constant-lang); }
+.markdown-body pre code .numeric { color: var(--hl-numeric); }
+.markdown-body pre code .variable { color: var(--hl-variable); }
+.markdown-body pre code .parameter { color: var(--hl-param); }
+.markdown-body pre code .entity.name.tag { color: var(--hl-tag); }
+.markdown-body pre code .support.macro { color: var(--hl-macro); }
+.markdown-body pre code .support.function { color: var(--hl-entity); }
+.markdown-body pre code .invalid { color: var(--hl-invalid); background: var(--hl-invalid-bg); }
+.markdown-body pre code .markup { color: var(--hl-markup); }
 
 /* Obsidian wikilinks & embeds */
 .markdown-body a.wikilink { color: var(--link); text-decoration: none; border-bottom: 1px solid transparent; }

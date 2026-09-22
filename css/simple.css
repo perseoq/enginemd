@@ -2,7 +2,7 @@
 [hidden] { display: none !important; }
 body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 16px; line-height: 1.7; color: #333; background: #fafafa; }
 
-.top-bar { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; background: #fff; border-bottom: 1px solid #eee; font-size: 0.85rem; }
+.top-bar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; background: #fff; border-bottom: 1px solid #eee; font-size: 0.85rem; }
 .top-bar .home-link { color: #333; text-decoration: none; }
 .top-bar .home-link:hover { text-decoration: underline; }
 .top-bar .site-label { color: #999; }

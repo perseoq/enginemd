@@ -1212,8 +1212,9 @@ mod tests {
         assert!(headers.get("cache-control").is_some());
         assert!(body.contains("--body-bg"));
         assert!(body.contains("[hidden]"), "hidden reset missing");
-        assert!(body.contains("#2d2a2e"), "monokai background missing");
-        assert!(body.contains("#ff6188"), "monokai keyword color missing");
+        assert!(body.contains("position: sticky"), "sticky top-bar missing");
+        assert!(body.contains("#2d2a2e"), "monokai light background missing");
+        assert!(body.contains("#191622"), "omni dark background missing");
     }
 
     #[tokio::test]
