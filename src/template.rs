@@ -17,7 +17,6 @@ impl TemplateEngine {
             .expect("error template");
 
         tera.register_filter("range", range_filter);
-        tera.register_filter("basename", basename_filter);
 
         Self { tera }
     }
@@ -144,6 +143,7 @@ pub struct ListingEntry {
     pub name: String,
     pub path: String,
     pub description: String,
+    pub heading: String,
     pub last_modified: String,
     pub active: bool,
 }
@@ -161,18 +161,6 @@ fn range_filter(
             .map(|v| tera::Value::Number(v.into()))
             .collect(),
     ))
-}
-
-fn basename_filter(
-    value: &tera::Value,
-    _args: &HashMap<String, tera::Value>,
-) -> tera::Result<tera::Value> {
-    let path = value.as_str().unwrap_or("");
-    let name = std::path::Path::new(path)
-        .file_name()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.to_string());
-    Ok(tera::Value::String(name))
 }
 
 pub fn bundled_css(name: &str) -> &'static str {

@@ -43,8 +43,22 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 .site-card:hover { border-color: var(--card-hover-border); box-shadow: var(--card-hover-shadow, none); }
 .site-name { font-size: 1.1rem; font-weight: 600; color: var(--site-name); margin-bottom: 0.25rem; }
 .site-desc { font-size: 0.9rem; color: var(--site-desc); margin-bottom: 0.5rem; }
-.site-path { display: block; font-size: 0.8rem; color: var(--site-path); font-family: var(--font-mono); }
 .site-date { display: block; font-size: 0.75rem; color: var(--site-date); margin-top: 0.25rem; }
+
+.search-box { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.5rem 0; }
+.search-box input { width: 100%; box-sizing: border-box; padding: 0.7rem 1rem; font-size: 1rem; color: var(--body-text); background: var(--body-bg); border: 1px solid var(--card-border); border-radius: 6px; }
+.search-box input:focus { outline: none; border-color: var(--card-hover-border); box-shadow: 0 0 0 2px var(--card-hover-shadow); }
+.search-results { max-width: 1000px; margin: 0 auto; }
+.search-empty { color: var(--empty-text); text-align: center; padding: 2rem 0; }
+.search-site { margin-bottom: 1.5rem; }
+.search-site-name { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.5rem; }
+.search-site-name a { color: var(--site-name); text-decoration: none; }
+.search-site-name a:hover { text-decoration: underline; }
+.search-item { display: block; padding: 0.6rem 0.75rem; border: 1px solid var(--card-border); border-radius: 6px; margin-bottom: 0.5rem; text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.search-item:hover { border-color: var(--card-hover-border); box-shadow: var(--card-hover-shadow, none); }
+.search-item-title { display: block; font-weight: 600; color: var(--link); margin-bottom: 0.15rem; }
+.search-snippet { display: block; font-size: 0.85rem; color: var(--site-desc); }
+.search-snippet mark { background: var(--pagination-active-bg); color: var(--pagination-active-text); border-radius: 2px; padding: 0 0.1em; }
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 0.25rem; margin-top: 2rem; padding: 1rem 0; flex-wrap: wrap; }
 .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; height: 2rem; padding: 0 0.5rem; border: 1px solid var(--pagination-border); border-radius: 4px; color: var(--link); text-decoration: none; font-size: 0.85rem; transition: background 0.15s; }

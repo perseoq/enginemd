@@ -43,7 +43,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .site-card:hover { border-color: #0969da; box-shadow: 0 1px 3px rgba(9,105,218,0.15); }
 .site-name { font-size: 1.1rem; font-weight: 600; color: #0969da; margin-bottom: 0.25rem; }
 .site-desc { font-size: 0.9rem; color: #57606a; margin-bottom: 0.5rem; }
-.site-path { display: block; font-size: 0.8rem; color: #8b949e; font-family: "SFMono-Regular", Consolas, monospace; }
 .site-date { display: block; font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem; }
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 0.25rem; margin-top: 2rem; padding: 1rem 0; flex-wrap: wrap; }

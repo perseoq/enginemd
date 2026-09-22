@@ -40,7 +40,6 @@ body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 16px; line-h
 .site-card:hover { border-color: #ccc; }
 .site-name { font-size: 1rem; font-weight: 500; color: #333; margin-bottom: 0.25rem; }
 .site-desc { font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; }
-.site-path { display: block; font-size: 0.75rem; color: #999; font-family: Consolas, monospace; }
 .site-date { display: block; font-size: 0.7rem; color: #bbb; margin-top: 0.25rem; }
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 0.15rem; margin-top: 2rem; padding: 1rem 0; flex-wrap: wrap; }

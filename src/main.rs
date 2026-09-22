@@ -7,6 +7,7 @@ mod obsidian;
 mod project;
 mod registry;
 mod renderer;
+mod search;
 mod server;
 mod system_theme;
 mod template;

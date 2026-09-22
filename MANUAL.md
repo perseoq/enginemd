@@ -235,8 +235,24 @@ Luego usa `[[Otra nota#^mi-bloque]]` o `![[Otra nota#^mi-bloque]]`.
 - **Conmutador de tema** en la barra superior (`Auto → Claro → Oscuro`).
 - **Compresión gzip** de las respuestas.
 - **Healthcheck**: `GET /__enginemd/health`.
+- **Búsqueda** en el listado (ver más abajo).
 - Los enlaces a `.md` se renderizan como HTML (no se sirve el Markdown crudo).
 - Los bloques de código conservan saltos de línea e indentación.
+
+### Búsqueda
+
+El listado incluye una caja de búsqueda entre la cabecera (hero) y las tarjetas
+de sitios.
+
+- Escribe 2 o más caracteres; el cliente consulta `GET /__enginemd/search?q=...`.
+- Los resultados se **agrupan por sitio (manual)** y muestran el título de la
+  página, un extracto con la coincidencia resaltada y un enlace directo.
+- Coincide por **nombre/descripción** del sitio y por el **contenido** de sus
+  páginas `.md`.
+- El índice de contenido se construye al primer uso y se **invalida con
+  `--watch`** al cambiar archivos.
+- Límites: 10 resultados por sitio y 50 en total; archivos de más de 512 KB se
+  omiten. Búsqueda por subcadena, sin distinguir mayúsculas.
 
 ## Modo daemon
 

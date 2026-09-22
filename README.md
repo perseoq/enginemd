@@ -18,6 +18,7 @@ y soporte de bóvedas de Obsidian.
 - **Hot-reload** (`--watch`) y **modo daemon** con autoarranque.
 - **Export estático** (`build`) para GitHub Pages.
 - TOC plegable, botón de copiar, compresión gzip y healthcheck.
+- **Búsqueda** en el listado: filtra por nombre y encuentra texto dentro de los manuales.
 - Títulos, subtítulo, enlace de inicio y footer **personalizables** en `settings.json`.
 
 ## Instalación

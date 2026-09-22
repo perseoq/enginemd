@@ -32,22 +32,32 @@
     <p class="count">{{ total }} site(s) registered</p>
   </header>
 
+  {% if directories | length > 0 %}
+  <form class="search-box" role="search">
+    <input id="search-input" type="search" placeholder="Buscar en manuales…" autocomplete="off" aria-label="Buscar">
+  </form>
+  {% endif %}
+
   <main class="listing-main">
+    <section id="search-results" class="search-results" hidden></section>
     {% if directories | length == 0 %}
       <div class="empty-state">
         <p>No active sites registered.</p>
         <p class="hint">Use <code>enginemd new &lt;name&gt;</code> or <code>enginemd up &lt;path&gt;</code> to add one.</p>
       </div>
     {% else %}
-      <div class="site-grid">
+      <div class="site-grid" id="site-grid">
         {% for dir in directories %}
         <a href="/{{ dir.name }}/" class="site-card">
           <div class="card-body">
-            <h2 class="site-name">{{ dir.name }}</h2>
+            {% if dir.heading %}
+            <h1 class="site-name">{{ dir.heading }}</h1>
+            {% else %}
+            <h1 class="site-name">{{ dir.name }}</h1>
+            {% endif %}
             {% if dir.description %}
             <p class="site-desc">{{ dir.description }}</p>
             {% endif %}
-            <span class="site-path">{{ dir.path | basename }}</span>
             {% if dir.last_modified %}
             <span class="site-date">{{ dir.last_modified }}</span>
             {% endif %}
@@ -57,7 +67,7 @@
       </div>
 
       {% if total_pages > 1 %}
-      <nav class="pagination" role="navigation" aria-label="Pagination">
+      <nav class="pagination" id="pagination" role="navigation" aria-label="Pagination">
         {% if current_page > 1 %}
         <a href="/?page={{ current_page - 1 }}" class="page-link prev">&laquo; Previous</a>
         {% else %}
@@ -98,6 +108,116 @@
   <footer class="listing-footer">
     <p>{{ footer_text }}</p>
   </footer>
+  <script>
+    (function() {
+      var input = document.getElementById('search-input');
+      var results = document.getElementById('search-results');
+      var grid = document.getElementById('site-grid');
+      var pagination = document.getElementById('pagination');
+      if (!input || !results) { return; }
+
+      var timer = null;
+      var controller = null;
+
+      function setMode(searching) {
+        results.hidden = !searching;
+        if (grid) { grid.hidden = searching; }
+        if (pagination) { pagination.hidden = searching; }
+      }
+
+      function appendHighlighted(parent, text, term) {
+        var source = String(text);
+        var lower = source.toLowerCase();
+        var q = term.toLowerCase();
+        if (!q) { parent.appendChild(document.createTextNode(source)); return; }
+        var i = 0;
+        while (true) {
+          var at = lower.indexOf(q, i);
+          if (at === -1) {
+            parent.appendChild(document.createTextNode(source.slice(i)));
+            break;
+          }
+          if (at > i) { parent.appendChild(document.createTextNode(source.slice(i, at))); }
+          var mark = document.createElement('mark');
+          mark.textContent = source.slice(at, at + q.length);
+          parent.appendChild(mark);
+          i = at + q.length;
+        }
+      }
+
+      function render(data, term) {
+        results.textContent = '';
+        var sites = (data && data.sites) || [];
+        if (sites.length === 0) {
+          var empty = document.createElement('p');
+          empty.className = 'search-empty';
+          empty.textContent = 'Sin resultados para "' + term + '".';
+          results.appendChild(empty);
+          return;
+        }
+        sites.forEach(function(site) {
+          var box = document.createElement('div');
+          box.className = 'search-site';
+
+          var head = document.createElement('h2');
+          head.className = 'search-site-name';
+          var link = document.createElement('a');
+          link.href = site.url;
+          link.textContent = site.name;
+          head.appendChild(link);
+          box.appendChild(head);
+
+          (site.matches || []).forEach(function(m) {
+            var item = document.createElement('a');
+            item.className = 'search-item';
+            item.href = m.url;
+
+            var title = document.createElement('span');
+            title.className = 'search-item-title';
+            title.textContent = m.title;
+            item.appendChild(title);
+
+            if (m.snippet) {
+              var snippet = document.createElement('span');
+              snippet.className = 'search-snippet';
+              appendHighlighted(snippet, m.snippet, term);
+              item.appendChild(snippet);
+            }
+            box.appendChild(item);
+          });
+
+          results.appendChild(box);
+        });
+      }
+
+      function run() {
+        var term = input.value.trim();
+        if (term.length < 2) {
+          if (controller) { controller.abort(); controller = null; }
+          setMode(false);
+          results.textContent = '';
+          return;
+        }
+        setMode(true);
+        if (controller) { controller.abort(); }
+        controller = new AbortController();
+        fetch('/__enginemd/search?q=' + encodeURIComponent(term), {
+          cache: 'no-store',
+          signal: controller.signal
+        })
+          .then(function(r) { return r.json(); })
+          .then(function(d) { render(d, term); })
+          .catch(function(e) {
+            if (e && e.name === 'AbortError') { return; }
+          });
+      }
+
+      input.addEventListener('input', function() {
+        if (timer) { clearTimeout(timer); }
+        timer = setTimeout(run, 250);
+      });
+    })();
+  </script>
   <script>
     (function() {
       var root = document.documentElement;

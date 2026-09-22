@@ -19,6 +19,7 @@ use crate::assets::{self, AssetManager, CssAsset, FileKind, Position, ScriptAsse
 use crate::config::{self, DirectoryEntry, Settings};
 use crate::obsidian::VaultIndex;
 use crate::renderer::{self, render_markdown, Frontmatter, RenderContext};
+use crate::search::{self, ContentIndex};
 use crate::template::{ListingEntry, TemplateEngine};
 
 #[derive(Clone)]
@@ -33,6 +34,7 @@ pub struct AppState {
     pub override_js: Option<Vec<String>>,
     pub vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
     pub obsidian_detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
+    pub search_indexes: Arc<std::sync::RwLock<HashMap<String, Arc<ContentIndex>>>>,
     pub assets: Arc<AssetManager>,
     pub assets_base: std::path::PathBuf,
     pub theme_cache: Arc<crate::system_theme::ThemeCache>,
@@ -59,6 +61,7 @@ pub async fn start_server(
         override_js,
         vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
         obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
+        search_indexes: Arc::new(std::sync::RwLock::new(HashMap::new())),
         assets: Arc::new(AssetManager::new(
             config::assets_base(&settings),
             settings.cdn_base.clone(),
@@ -106,8 +109,9 @@ pub async fn start_server(
         let tx = reload_tx.clone();
         let vaults = state.vaults.clone();
         let detect = state.obsidian_detect.clone();
+        let search = state.search_indexes.clone();
         tokio::spawn(async move {
-            if let Err(e) = start_file_watcher(dirs, tx, vaults, detect) {
+            if let Err(e) = start_file_watcher(dirs, tx, vaults, detect, search) {
                 eprintln!("File watcher error: {e}");
             }
         });
@@ -128,6 +132,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/__enginemd/css/{*file}", get(css_handler))
         .route("/__enginemd/health", get(health_handler))
         .route("/__enginemd/theme", get(theme_handler))
+        .route("/__enginemd/search", get(search_handler))
         .route("/__enginemd/ws", get(ws_handler))
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive())
@@ -156,11 +161,129 @@ async fn theme_handler(State(state): State<AppState>) -> Response {
     (headers, body).into_response()
 }
 
+#[derive(serde::Serialize)]
+struct SearchResponse {
+    query: String,
+    sites: Vec<SearchSite>,
+}
+
+#[derive(serde::Serialize)]
+struct SearchSite {
+    name: String,
+    url: String,
+    matches: Vec<SearchMatch>,
+}
+
+#[derive(serde::Serialize)]
+struct SearchMatch {
+    title: String,
+    page: String,
+    url: String,
+    snippet: String,
+}
+
+const SEARCH_MIN_CHARS: usize = 2;
+const SEARCH_PER_SITE: usize = 10;
+const SEARCH_TOTAL: usize = 50;
+
+async fn search_handler(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    let query = params.get("q").map(|s| s.trim()).unwrap_or("").to_string();
+
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", "application/json".parse().unwrap());
+    headers.insert("Cache-Control", "no-store".parse().unwrap());
+
+    if query.chars().count() < SEARCH_MIN_CHARS {
+        return (
+            headers,
+            serde_json::json!({ "query": "", "sites": [] }).to_string(),
+        )
+            .into_response();
+    }
+
+    // (name, path, url_prefix, description)
+    let mut sites: Vec<(String, String, String, String)> = Vec::new();
+    if let Some(ref single) = state.override_path {
+        let name = Path::new(single)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "Site".to_string());
+        let (description, _heading, _modified) = get_site_meta(Path::new(single));
+        sites.push((name, single.clone(), "/".to_string(), description));
+    } else {
+        for dir in state.settings.directories.iter().filter(|d| d.active) {
+            let (description, _heading, _modified) = get_site_meta(Path::new(&dir.path));
+            sites.push((
+                dir.name.clone(),
+                dir.path.clone(),
+                format!("/{}/", dir.name),
+                description,
+            ));
+        }
+    }
+
+    let needle = query.to_lowercase();
+    let mut out: Vec<SearchSite> = Vec::new();
+    let mut total = 0usize;
+
+    for (name, path, prefix, description) in &sites {
+        if total >= SEARCH_TOTAL {
+            break;
+        }
+        let name_hit =
+            name.to_lowercase().contains(&needle) || description.to_lowercase().contains(&needle);
+
+        let index = get_search_index(&state, path);
+        let limit = SEARCH_PER_SITE.min(SEARCH_TOTAL - total);
+        let mut matches: Vec<SearchMatch> = Vec::new();
+        if limit > 0 && !index.is_empty() {
+            for hit in search::search(&index, &query, limit) {
+                matches.push(SearchMatch {
+                    url: crate::obsidian::encode_path(&format!("{prefix}{}", hit.page)),
+                    title: hit.title,
+                    page: hit.page,
+                    snippet: hit.snippet,
+                });
+            }
+        }
+        total += matches.len();
+
+        if name_hit || !matches.is_empty() {
+            out.push(SearchSite {
+                name: name.clone(),
+                url: prefix.clone(),
+                matches,
+            });
+        }
+    }
+
+    let payload = SearchResponse { query, sites: out };
+    let body = serde_json::to_string(&payload).unwrap_or_else(|_| "{\"sites\":[]}".to_string());
+    (headers, body).into_response()
+}
+
+fn get_search_index(state: &AppState, site_path: &str) -> Arc<ContentIndex> {
+    if let Some(index) = state.search_indexes.read().unwrap().get(site_path) {
+        return index.clone();
+    }
+    let index = Arc::new(ContentIndex::build(Path::new(site_path)));
+    state
+        .search_indexes
+        .write()
+        .unwrap()
+        .insert(site_path.to_string(), index.clone());
+    index
+}
+
 fn start_file_watcher(
     paths: Vec<String>,
     reload_tx: broadcast::Sender<String>,
     vaults: Arc<std::sync::RwLock<HashMap<String, Arc<VaultIndex>>>>,
     detect: Arc<std::sync::RwLock<HashMap<String, bool>>>,
+    search: Arc<std::sync::RwLock<HashMap<String, Arc<ContentIndex>>>>,
 ) -> Result<(), String> {
     let (event_tx, event_rx) = std::sync::mpsc::channel::<()>();
 
@@ -213,6 +336,9 @@ fn start_file_watcher(
             }
             if let Ok(mut d) = detect.write() {
                 d.clear();
+            }
+            if let Ok(mut s) = search.write() {
+                s.clear();
             }
             let _ = reload_tx.send("reload".to_string());
         }
@@ -306,11 +432,12 @@ async fn listing_handler(state: &AppState, page_param: Option<&String>) -> Respo
     let mut entries = Vec::new();
     for dir in &slice {
         let site_path = Path::new(&dir.path);
-        let (description, last_modified) = get_site_meta(site_path);
+        let (description, heading, last_modified) = get_site_meta(site_path);
         entries.push(ListingEntry {
             name: dir.name.clone(),
             path: dir.path.clone(),
             description,
+            heading,
             last_modified,
             active: dir.active,
         });
@@ -336,19 +463,23 @@ async fn listing_handler(state: &AppState, page_param: Option<&String>) -> Respo
     Html(html).into_response()
 }
 
-fn get_site_meta(site_path: &Path) -> (String, String) {
-    let index_md = site_path.join("index.md");
-    let desc_text = if index_md.exists() {
+fn get_site_meta(site_path: &Path) -> (String, String, String) {
+    let mut description = String::new();
+    let mut heading = String::new();
+
+    for name in &["index.md", "init.md"] {
+        let index_md = site_path.join(name);
+        if !index_md.exists() {
+            continue;
+        }
         if let Ok(content) = std::fs::read_to_string(&index_md) {
             let mut fm = Frontmatter::default();
             crate::renderer::extract_frontmatter(&content, &mut fm);
-            fm.description.unwrap_or_default()
-        } else {
-            String::new()
+            description = fm.description.unwrap_or_default();
+            heading = crate::renderer::extract_first_heading(&content).unwrap_or_default();
         }
-    } else {
-        String::new()
-    };
+        break;
+    }
 
     let modified = std::fs::metadata(site_path)
         .ok()
@@ -359,7 +490,7 @@ fn get_site_meta(site_path: &Path) -> (String, String) {
         })
         .unwrap_or_default();
 
-    (desc_text, modified)
+    (description, heading, modified)
 }
 
 async fn serve_single_site(
@@ -1041,6 +1172,7 @@ mod tests {
             override_js: None,
             vaults: Arc::new(std::sync::RwLock::new(HashMap::new())),
             obsidian_detect: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            search_indexes: Arc::new(std::sync::RwLock::new(HashMap::new())),
             assets: Arc::new(AssetManager::new(base.clone(), None, Vec::new())),
             assets_base: base,
             theme_cache: Arc::new(crate::system_theme::ThemeCache::new(
@@ -1128,15 +1260,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn listing_shows_only_folder_name() {
-        let root = std::env::temp_dir().join(format!("enginemd-folder-{}", std::process::id()));
+    async fn listing_shows_heading_without_folder_name() {
+        let root = std::env::temp_dir().join(format!("enginemd-heading-{}", std::process::id()));
         let site = root.join("proyecto-demo");
         std::fs::create_dir_all(&site).unwrap();
-        std::fs::write(site.join("index.md"), "# Hi\n").unwrap();
+        std::fs::write(
+            site.join("index.md"),
+            "---\ndescription: Una descripcion\n---\n\n# Titulo Bonito\n\nTexto.\n",
+        )
+        .unwrap();
 
         let mut state = test_state();
         state.settings.directories.push(DirectoryEntry {
-            name: "Otro Nombre".to_string(),
+            name: "proyecto-demo".to_string(),
             path: site.to_string_lossy().to_string(),
             active: true,
             js_support: None,
@@ -1147,8 +1283,12 @@ mod tests {
         let (status, _headers, body) = get(build_router(state), "/").await;
         assert_eq!(status, StatusCode::OK);
         assert!(
-            body.contains(r#"class="site-path">proyecto-demo<"#),
-            "expected folder name in listing: {body}"
+            body.contains(r#"<h1 class="site-name">Titulo Bonito</h1>"#),
+            "expected markdown heading as title: {body}"
+        );
+        assert!(
+            !body.contains("site-folder"),
+            "folder name must not be shown"
         );
         assert!(
             !body.contains(&site.to_string_lossy().to_string()),
@@ -1156,6 +1296,86 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[tokio::test]
+    async fn listing_without_heading_uses_folder_as_title() {
+        let root = std::env::temp_dir().join(format!("enginemd-nohead-{}", std::process::id()));
+        let site = root.join("sin-titulo");
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.md"), "Solo texto, sin encabezado.\n").unwrap();
+
+        let mut state = test_state();
+        state.settings.directories.push(DirectoryEntry {
+            name: "sin-titulo".to_string(),
+            path: site.to_string_lossy().to_string(),
+            active: true,
+            js_support: None,
+            lang: None,
+            obsidian: None,
+        });
+
+        let (status, _headers, body) = get(build_router(state), "/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            body.contains(r#"<h1 class="site-name">sin-titulo</h1>"#),
+            "folder name must be the h1 when there is no heading"
+        );
+        assert!(
+            !body.contains("site-folder"),
+            "no folder line without heading"
+        );
+        assert!(!body.contains(&site.to_string_lossy().to_string()));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[tokio::test]
+    async fn search_endpoint_finds_page_content() {
+        let root = std::env::temp_dir().join(format!("enginemd-search-{}", std::process::id()));
+        let site = root.join("manual-demo");
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.md"), "# Portada\n\nBienvenido.\n").unwrap();
+        std::fs::write(
+            site.join("guia.md"),
+            "# Guia\n\nContiene una palabraunica especial.\n",
+        )
+        .unwrap();
+
+        let mut state = test_state();
+        state.settings.directories.push(DirectoryEntry {
+            name: "manual-demo".to_string(),
+            path: site.to_string_lossy().to_string(),
+            active: true,
+            js_support: None,
+            lang: None,
+            obsidian: None,
+        });
+
+        let (status, headers, body) =
+            get(build_router(state), "/__enginemd/search?q=palabraunica").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(headers
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.contains("application/json"))
+            .unwrap_or(false));
+        assert!(
+            body.contains("\"manual-demo\""),
+            "site name missing: {body}"
+        );
+        assert!(body.contains("\"page\":\"guia\""), "page missing: {body}");
+        assert!(body.contains("palabraunica"), "snippet missing: {body}");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[tokio::test]
+    async fn search_endpoint_ignores_short_query() {
+        let (status, _headers, body) =
+            get(build_router(test_state()), "/__enginemd/search?q=a").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("\"sites\":[]"), "unexpected body: {body}");
     }
 
     #[tokio::test]

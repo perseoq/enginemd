@@ -167,7 +167,7 @@ fn url_for_unresolved(target: &str, prefix: &str, fragment: Option<&str>) -> Str
     url
 }
 
-fn encode_path(rel: &str) -> String {
+pub(crate) fn encode_path(rel: &str) -> String {
     rel.split('/')
         .map(|seg| utf8_percent_encode(seg, PATH_ENCODE_SET).to_string())
         .collect::<Vec<_>>()
