@@ -22,7 +22,7 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 .markdown-body li { margin: 0.25rem 0; }
 .markdown-body hr { margin: 1.5rem 0; border: 0; border-top: 1px solid var(--heading-border); }
 .markdown-body pre { position: relative; margin: 1rem 0; padding: 1rem; background: var(--pre-bg); border: 1px solid var(--pre-border, transparent); border-radius: 6px; overflow-x: auto; font-size: calc(0.85rem + 2pt); }
-.markdown-body code { font-family: var(--font-mono); font-size: 0.85em; padding: 0.2em 0.4em; background: var(--code-bg); border-radius: 3px; }
+.markdown-body code { font-family: var(--font-mono); font-size: 0.85em; padding: 0.2em 0.4em; background: #2d2a2e; color: #fcfcfa; border-radius: 3px; }
 .markdown-body pre code { padding: 0; background: none; }
 .markdown-body table { width: 100%; margin: 1rem 0; border-collapse: collapse; }
 .markdown-body th, .markdown-body td { padding: 0.5rem 0.75rem; border: 1px solid var(--table-border); }
@@ -75,18 +75,30 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 
 .listing-footer { text-align: center; padding: 2rem 1.5rem; color: var(--footer-text); font-size: 0.8rem; border-top: 1px solid var(--footer-border); margin-top: 2rem; }
 
-/* Syntax highlighting (syntect ClassStyle::Spaced) */
-.markdown-body pre code .comment { color: #6a737d; font-style: italic; }
-.markdown-body pre code .keyword { color: #d73a49; }
-.markdown-body pre code .storage { color: #d73a49; }
-.markdown-body pre code .string { color: #032f62; }
-.markdown-body pre code .constant { color: #005cc5; }
-.markdown-body pre code .entity { color: #6f42c1; }
-.markdown-body pre code .support { color: #005cc5; }
-.markdown-body pre code .variable { color: #e36209; }
-.markdown-body pre code .meta { color: #6a737d; }
-.markdown-body pre code .invalid { color: #b31d28; background: #ffeef0; }
-.markdown-body pre code .markup { color: #22863a; }
+/* Syntax highlighting (syntect ClassStyle::Spaced) — Monokai Pro palette.
+   Fixed on purpose: code always looks the same in light and dark themes. */
+.markdown-body pre { background: #2d2a2e; border-color: #3b383c; color: #fcfcfa; }
+.markdown-body pre code { color: #fcfcfa; }
+.markdown-body pre code .comment { color: #727072; font-style: italic; }
+.markdown-body pre code .punctuation { color: #939293; }
+.markdown-body pre code .meta { color: inherit; }
+.markdown-body pre code .type { color: #78dce8; }
+.markdown-body pre code .storage { color: #ff6188; }
+.markdown-body pre code .keyword { color: #ff6188; }
+.markdown-body pre code .operator { color: #ff6188; }
+.markdown-body pre code .string { color: #ffd866; }
+.markdown-body pre code .constant { color: #ab9df2; }
+.markdown-body pre code .numeric { color: #ab9df2; }
+.markdown-body pre code .entity { color: #78dce8; }
+.markdown-body pre code .support { color: #78dce8; }
+.markdown-body pre code .function { color: #a9dc76; }
+.markdown-body pre code .support.macro { color: #ab9df2; }
+.markdown-body pre code .entity.name.tag { color: #ff6188; }
+.markdown-body pre code .storage.type.function { color: #ff6188; }
+.markdown-body pre code .variable { color: #fcfcfa; }
+.markdown-body pre code .parameter { color: #fc9867; }
+.markdown-body pre code .invalid { color: #ff6188; background: rgba(255,97,136,0.12); }
+.markdown-body pre code .markup { color: #a9dc76; }
 
 /* Obsidian wikilinks & embeds */
 .markdown-body a.wikilink { color: var(--link); text-decoration: none; border-bottom: 1px solid transparent; }
@@ -129,18 +141,6 @@ body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-
 
 /* Dark mode (Dracula) overrides: follows the OS color scheme */
 @media (prefers-color-scheme: dark) {
-  .markdown-body pre code .comment { color: #6272a4; }
-  .markdown-body pre code .keyword { color: #ff79c6; }
-  .markdown-body pre code .storage { color: #ff79c6; }
-  .markdown-body pre code .string { color: #f1fa8c; }
-  .markdown-body pre code .constant { color: #bd93f9; }
-  .markdown-body pre code .entity { color: #50fa7b; }
-  .markdown-body pre code .support { color: #8be9fd; }
-  .markdown-body pre code .variable { color: #ffb86c; }
-  .markdown-body pre code .meta { color: #6272a4; }
-  .markdown-body pre code .invalid { color: #ff5555; background: rgba(255,85,85,0.12); }
-  .markdown-body pre code .markup { color: #50fa7b; }
-
   .markdown-body .callout-note, .markdown-body .callout-info { border-left-color: #8be9fd; background: rgba(139,233,253,0.08); }
   .markdown-body .callout-warning { border-left-color: #f1fa8c; background: rgba(241,250,140,0.08); }
   .markdown-body .callout-tip, .markdown-body .callout-hint { border-left-color: #50fa7b; background: rgba(80,250,123,0.08); }
