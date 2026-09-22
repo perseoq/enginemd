@@ -1,4 +1,5 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 body { font-family: var(--font-family); font-size: var(--font-size, 16px); line-height: var(--line-height, 1.6); color: var(--body-text); background: var(--body-bg); }
 
 .top-bar { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.5rem; background: var(--topbar-bg); border-bottom: 1px solid var(--topbar-border); font-size: 0.9rem; }

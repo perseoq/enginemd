@@ -1211,6 +1211,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(headers.get("cache-control").is_some());
         assert!(body.contains("--body-bg"));
+        assert!(body.contains("[hidden]"), "hidden reset missing");
     }
 
     #[tokio::test]
