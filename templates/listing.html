@@ -47,7 +47,7 @@
             {% if dir.description %}
             <p class="site-desc">{{ dir.description }}</p>
             {% endif %}
-            <span class="site-path">{{ dir.path }}</span>
+            <span class="site-path">{{ dir.path | basename }}</span>
             {% if dir.last_modified %}
             <span class="site-date">{{ dir.last_modified }}</span>
             {% endif %}

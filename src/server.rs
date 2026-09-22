@@ -1128,6 +1128,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn listing_shows_only_folder_name() {
+        let root = std::env::temp_dir().join(format!("enginemd-folder-{}", std::process::id()));
+        let site = root.join("proyecto-demo");
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.md"), "# Hi\n").unwrap();
+
+        let mut state = test_state();
+        state.settings.directories.push(DirectoryEntry {
+            name: "Otro Nombre".to_string(),
+            path: site.to_string_lossy().to_string(),
+            active: true,
+            js_support: None,
+            lang: None,
+            obsidian: None,
+        });
+
+        let (status, _headers, body) = get(build_router(state), "/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            body.contains(r#"class="site-path">proyecto-demo<"#),
+            "expected folder name in listing: {body}"
+        );
+        assert!(
+            !body.contains(&site.to_string_lossy().to_string()),
+            "full path must not appear in listing"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[tokio::test]
     async fn page_uses_configured_home_label() {
         let site = std::env::temp_dir().join(format!("enginemd-home-{}", std::process::id()));
         std::fs::create_dir_all(&site).unwrap();
