@@ -49,6 +49,7 @@ impl TemplateEngine {
         ctx.insert("app_title", app_title);
         ctx.insert("listing_subtitle", listing_subtitle);
         ctx.insert("footer_text", footer_text);
+        ctx.insert("css_version", css_version());
         insert_theme(&mut ctx, theme);
 
         self.tera
@@ -94,6 +95,7 @@ impl TemplateEngine {
         ctx.insert("body_scripts", body_scripts);
         ctx.insert("watch_mode", &watch_mode);
         ctx.insert("home_label", home_label);
+        ctx.insert("css_version", css_version());
         insert_theme(&mut ctx, theme);
 
         self.tera
@@ -116,6 +118,7 @@ impl TemplateEngine {
         ctx.insert("lang", lang);
         ctx.insert("css_theme", css_theme);
         ctx.insert("app_title", app_title);
+        ctx.insert("css_version", css_version());
         insert_theme(&mut ctx, theme);
 
         self.tera.render("error", &ctx).unwrap_or_else(|e| {
@@ -161,6 +164,17 @@ fn range_filter(
             .map(|v| tera::Value::Number(v.into()))
             .collect(),
     ))
+}
+
+/// Content-hash token for the built-in CSS (base + auto theme), used to
+/// version the `<link>` URLs so caches cannot serve stale styles.
+pub fn css_version() -> &'static str {
+    static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    VERSION.get_or_init(|| {
+        let mut content = String::from(include_str!("../css/base.css"));
+        content.push_str(&crate::themes::render_auto_theme_css());
+        crate::assets::content_version(&content)
+    })
 }
 
 pub fn bundled_css(name: &str) -> &'static str {

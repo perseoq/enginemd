@@ -1033,13 +1033,13 @@ async fn css_handler(
     // 1. Serve base.css from bundled assets
     if file == "base.css" {
         let bundled = include_str!("../css/base.css");
-        return serve_css(bundled, false);
+        return serve_css(bundled, versioned);
     }
 
     // 2. Automatic theme: follows the OS color scheme.
     if file == "auto.css" {
         let css = crate::themes::render_auto_theme_css();
-        return serve_css(&css, false);
+        return serve_css(&css, versioned);
     }
 
     // 3. Try file from the assets dir (downloaded or user custom themes)
@@ -1054,13 +1054,13 @@ async fn css_handler(
     let theme_name = file.trim_end_matches(".css");
     if let Some(theme) = crate::themes::find_theme(theme_name) {
         let css = crate::themes::render_theme_css(theme);
-        return serve_css(&css, false);
+        return serve_css(&css, versioned);
     }
 
     // 5. Try bundled CSS (legacy)
     let bundled = crate::template::bundled_css(&file);
     if !bundled.is_empty() {
-        return serve_css(bundled, false);
+        return serve_css(bundled, versioned);
     }
 
     (StatusCode::NOT_FOUND, "CSS not found").into_response()
@@ -1211,6 +1211,47 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(headers.get("cache-control").is_some());
         assert!(body.contains("--body-bg"));
+    }
+
+    #[tokio::test]
+    async fn versioned_css_is_immutable() {
+        let (status, headers, _body) = get(
+            build_router(test_state()),
+            "/__enginemd/css/base.css?v=abc123",
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let cc = headers
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert!(cc.contains("immutable"), "cache-control: {cc}");
+    }
+
+    #[tokio::test]
+    async fn listing_and_page_link_versioned_css() {
+        let site = std::env::temp_dir().join(format!("enginemd-cssver-{}", std::process::id()));
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.md"), "# Hi\n").unwrap();
+
+        let mut state = test_state();
+        state.settings.directories.push(DirectoryEntry {
+            name: "sitio".to_string(),
+            path: site.to_string_lossy().to_string(),
+            active: true,
+            js_support: None,
+            lang: None,
+            obsidian: None,
+        });
+
+        let (_s1, _h1, listing) = get(build_router(state.clone()), "/").await;
+        assert!(listing.contains("base.css?v="), "listing: {listing}");
+        assert!(listing.contains("auto.css?v="), "listing: {listing}");
+
+        let (_s2, _h2, page) = get(build_router(state), "/sitio/").await;
+        assert!(page.contains("base.css?v="), "page: {page}");
+
+        let _ = std::fs::remove_dir_all(&site);
     }
 
     #[tokio::test]

@@ -197,6 +197,18 @@ pub fn version_token(hash: &str) -> String {
         .collect()
 }
 
+/// Short content hash used to bust caches for static, in-binary content (CSS).
+pub fn content_version(content: &str) -> String {
+    let mut hasher = Sha384::new();
+    hasher.update(content.as_bytes());
+    let digest = hasher.finalize();
+    let hash = format!(
+        "sha384-{}",
+        base64::engine::general_purpose::STANDARD.encode(digest)
+    );
+    version_token(&hash)
+}
+
 /// Manages the local cache of downloaded assets and their SRI hashes.
 pub struct AssetManager {
     js_dir: PathBuf,

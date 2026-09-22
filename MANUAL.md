@@ -120,7 +120,9 @@ plano, y también se descarga bajo demanda si falta.
   `mermaid`/`chart`, fórmulas `$...$`, etc.), aunque no esté en `--js-support`.
 - `--js-support` es una **allowlist** de claves del catálogo.
 - **SRI** activo por defecto (`sri: false` para desactivarlo) y `defer`.
-- **Cache-Control**: assets con `?v=<hash>` e `immutable`; temas con `no-cache`.
+- **Cache-Control**: assets y CSS (base/tema) con `?v=<hash>` e `immutable`;
+  sin `?v`, `no-cache`. El `base.css` y el tema se versionan con el hash de su
+  contenido, así que un cambio de CSS nunca queda servido desde una caché vieja.
 - Si un asset no está y no se puede descargar, se avisa y se omite.
 - `enginemd fetch --force` fuerza la re-descarga.
 - `assets_dir` cambia la carpeta del caché; `cdn_base`/`cdn_fallbacks` cambian

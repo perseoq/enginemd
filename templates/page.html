@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="light dark">
   <title>{% if title %}{{ title }} &mdash; {% endif %}{{ site_title }}</title>
   {% if base_url %}<base href="{{ base_url }}">{% endif %}
-  <link rel="stylesheet" href="{{ asset_prefix }}css/base.css">
-  <link rel="stylesheet" href="{{ asset_prefix }}css/{{ css_theme }}">
+  <link rel="stylesheet" href="{{ asset_prefix }}css/base.css?v={{ css_version }}">
+  <link rel="stylesheet" href="{{ asset_prefix }}css/{{ css_theme }}?v={{ css_version }}">
   {% for css in extra_css %}
   <link rel="stylesheet" href="{{ css.href }}"{% if css.integrity %} integrity="{{ css.integrity }}"{% endif %}{% if css.media %} media="{{ css.media }}"{% endif %}>
   {% endfor %}
